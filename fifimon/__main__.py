@@ -18,10 +18,10 @@ from PyQt5.QtWidgets import (QWidget, QMainWindow, QPushButton, QMessageBox,QToo
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt
 
-import sys
+import os, sys
 import numpy as np
 
-class MyMplCanvas(FigureCanvas):
+class MplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
 
     def __init__(self, parent=None, width=5, height=4, dpi=100):
@@ -42,7 +42,7 @@ class MyMplCanvas(FigureCanvas):
         pass
 
 
-class RaDecCanvas(MyMplCanvas):
+class PositionCanvas(MplCanvas):
     """Simple canvas with a sine plot."""
 
     def compute_initial_figure(self):
@@ -51,7 +51,7 @@ class RaDecCanvas(MyMplCanvas):
         self.axes.plot(t, s)
 
 
-class FluxCanvas(MyMplCanvas):
+class FluxCanvas(MplCanvas):
     """A canvas that updates itself every 3 seconds with a new plot."""
 
     #def __init__(self, *args, **kwargs):
@@ -76,19 +76,34 @@ class myListWidget(QListWidget):
 #      QMessageBox.information(self, "ListWidget", "You clicked: "+item.text())
         # 2000 means message erased after 2 seconds
         #self.parent().parent().statusBar().showMessage("Clicked item "+item.text(),2000)
-        self.parent().parent().sb.showMessage("Clicked item "+item.text(),2000)
-#        self.parent().parent().listFiles.hide()
-        self.parent().parent().listFiles.setVisible(False)
+        mw = self.parent().parent()
+        mw.sb.showMessage("You selected the FileGroupID: "+item.text(),2000)
+#        self.parent().parent().lf.hide()
+        mw.lf.setVisible(False)
+        # Trigger event related to item list ....
+        print "item is ",item.text()
+        mw.addObs(item.text())
 
 
-        
 
 class ApplicationWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.setWindowTitle("application main window")
+        #        self.setWindowTitle("application main window")
+        path0 = sys.path[0]
 
+        # Start exploring directory
+        from fifitools import exploreDirectory
+        cwd = os.getcwd()
+        self.files,self.start,self.fgid = exploreDirectory(cwd+"/")
+        # Compile the list of unique File group IDs
+        self.fgidList = list(set(self.fgid))
+
+        # Start list of observations
+        self.fileNames = []
+        self.obs = []
+        
         # Menu
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.fileQuit,
@@ -104,16 +119,16 @@ class ApplicationWindow(QMainWindow):
         self.main_widget = QWidget(self)
 
         # Define sub widgets
-        sc = RaDecCanvas(self.main_widget, width=3, height=4, dpi=100)
+        sc = PositionCanvas(self.main_widget, width=3, height=4, dpi=100)
         dc = FluxCanvas(self.main_widget, width=8, height=4, dpi=100)
         self.mpl_toolbar = NavigationToolbar(sc, self)
         self.mpl_toolbar2 = NavigationToolbar(dc, self)
 
         # Actions
-        exitAction = QAction(QIcon('icons/exit24.png'), 'Exit', self)
+        exitAction = QAction(QIcon(path0+'/icons/exit24.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(qApp.quit)
-        hideAction = QAction(QIcon('icons/list.png'), 'Hide', self)
+        hideAction = QAction(QIcon(path0+'/icons/list.png'), 'Hide', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
 
@@ -124,14 +139,12 @@ class ApplicationWindow(QMainWindow):
         self.tb.addAction(hideAction)
 
         # Widget list
-        self.listFiles = myListWidget()
-        self.listFiles.addItem("Item 1"); 
-        self.listFiles.addItem("Item 2");
-        self.listFiles.addItem("Item 3");
-        self.listFiles.addItem("Item 4");
-        self.listFiles.setWindowTitle('PyQT QListwidget Demo')
-        self.listFiles.itemClicked.connect(self.listFiles.Clicked)
-
+        self.lf = myListWidget()
+        for item in self.fgidList:
+            self.lf.addItem(item); 
+        self.lf.setWindowTitle('File Group ID')
+        self.lf.itemClicked.connect(self.lf.Clicked)
+        
         self.sb = QStatusBar()
         
 
@@ -157,8 +170,8 @@ class ApplicationWindow(QMainWindow):
         splitter1.addWidget(fluxWidget)
 
         mainLayout.addWidget(splitter1)
-        mainLayout.addWidget(self.listFiles)
-        self.listFiles.hide()
+        mainLayout.addWidget(self.lf)
+        self.lf.hide()
 
         self.main_widget.setFocus()
         self.setCentralWidget(self.main_widget)
@@ -167,8 +180,8 @@ class ApplicationWindow(QMainWindow):
         self.sb.showMessage("Welcome to FIFI Monitor!", 10000)
 
     def changeVisibility(self):
-        state = self.listFiles.isVisible()
-        self.listFiles.setVisible(not state)
+        state = self.lf.isVisible()
+        self.lf.setVisible(not state)
 
         
     def fileQuit(self):
@@ -182,6 +195,18 @@ class ApplicationWindow(QMainWindow):
         message=file.read()
         QtWidgets.QMessageBox.about(self, "About", message)
 
+    def addObs(self, fileGroupId):
+        mask = self.fgid == fileGroupId
+        selFiles = self.files[mask]
+        selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
+        selFileNames = np.array(selFileNames)
+        print "Files selected are "
+        print selFileNames
+        # Check if file names already appear in previous list, otherwise append them and read/process/display relative data
+        
+
+""" Main code """
+        
 if __name__ == '__main__':
     qApp = QApplication(sys.argv)
 

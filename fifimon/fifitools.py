@@ -1,5 +1,39 @@
 # Several modules used for reading/reducing FIFI-LS data
 
+
+def exploreDirectory(path):
+    ''' Explore FITS files in a directory '''
+    # Should be smarter and open only files not yet considered
+    
+    from astropy.io import fits
+    import os, glob
+    import numpy as np
+
+    print "path is ",path    
+    files = sorted(glob.glob(path+'*.fits'), key=os.path.getctime)
+    files = np.array(files)
+
+    # Wavelenghts
+    start=[]
+    fgid=[]
+    
+    for infile in files:
+        hlf = fits.open(infile)
+        try:
+            h = hlf[0].header
+            proc = h['PROCSTAT']
+            if proc == 'LEVEL_1':
+                start.append(h['FIFISTRT'])
+                fgid.append(h['FILEGPID'])
+        except:
+            pass
+        hlf.close()
+
+    start=np.array(start)
+    fgid =np.array(fgid)    
+    return files, start, fgid
+
+
 def readData(fitsfile):
     from astropy.io import fits
     import numpy as np
