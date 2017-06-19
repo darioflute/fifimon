@@ -7,6 +7,13 @@
 
 # Reading the data, processing, displaying them
 import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib import rcParams
+rcParams['font.family']='STIXGeneral'
+rcParams['font.size']=18
+rcParams['mathtext.fontset']='stix'
+rcParams['legend.numpoints']=1
+
 # Make sure that we are using QT5
 matplotlib.use('Qt5Agg')
 from PyQt5 import QtCore, QtWidgets
@@ -20,6 +27,7 @@ from PyQt5.QtCore import Qt
 
 import os, sys
 import numpy as np
+old_settings = np.seterr(all='ignore')  # Avoid warning messages
 
 class MplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
@@ -61,13 +69,32 @@ class FluxCanvas(MplCanvas):
     #    timer.start(3000)
 
     def compute_initial_figure(self):
-        self.axes.plot([0, 1, 2, 3], [1, 2, 0, 4], 'r')
+        self.axes.set_xlim([0,20*20]) # Set at least 20 observations
+        self.axes.set_ylabel('Flux [V/s]')
+        self.axes.plot([0,0],[np.nan,np.nan],'.b')
 
-    def update_figure(self):
+    def updateFigure(self,nod,fn,spec):
+        # get number of grating positions
+        ng = (np.shape(spec))[1]
+        coverage = 16+0.5*ng
+        sp16 = np.arange(16)
         # Build a list of 4 random integers between 0 and 10 (both inclusive)
-        l = [random.randint(0, 10) for i in range(4)]
-        self.axes.cla()
-        self.axes.plot([0, 1, 2, 3], l, 'r')
+        #l = [random.randint(0, 10) for i in range(4)]
+        labels = []
+        for i in np.arange(len(fn)):
+            if nod[i] == 'A':
+                c = 'blue'
+            else:
+                c = 'red'
+            s = spec[i]
+            for j in np.arange(ng):
+                self.axes.plot(sp16+i*coverage+j*0.5, s[j,:], color=c)
+            self.axes.axvline(i*coverage, color='gray', linewidth=0.2)
+        self.axes.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
+        labels = np.array(fn, dtype='str')    
+        plt.xticks((np.arange(len(fn))+0.5)*coverage, labels, rotation='vertical',fontsize=15)
+        self.axes.yaxis.grid(True)
+        self.axes.autoscale(enable=True,axis='y')
         self.draw()
 
 class myListWidget(QListWidget):
@@ -96,10 +123,12 @@ class ApplicationWindow(QMainWindow):
         # Start exploring directory
         from fifitools import exploreDirectory
         cwd = os.getcwd()
-        self.files,self.start,self.fgid = exploreDirectory(cwd+"/")
+        self.files, self.start, self.fgid = exploreDirectory(cwd+"/")
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
+        # This step should be repeated in case new files appear, to update the plots
 
+        
         # Start list of observations
         self.fileNames = []
         self.obs = []
@@ -119,16 +148,16 @@ class ApplicationWindow(QMainWindow):
         self.main_widget = QWidget(self)
 
         # Define sub widgets
-        sc = PositionCanvas(self.main_widget, width=3, height=4, dpi=100)
-        dc = FluxCanvas(self.main_widget, width=8, height=4, dpi=100)
-        self.mpl_toolbar = NavigationToolbar(sc, self)
-        self.mpl_toolbar2 = NavigationToolbar(dc, self)
+        self.pc = PositionCanvas(self.main_widget, width=3, height=4, dpi=100)
+        self.fc = FluxCanvas(self.main_widget, width=8, height=4, dpi=100)
+        self.mpl_toolbar = NavigationToolbar(self.pc, self)
+        self.mpl_toolbar2 = NavigationToolbar(self.fc, self)
 
         # Actions
         exitAction = QAction(QIcon(path0+'/icons/exit24.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(qApp.quit)
-        hideAction = QAction(QIcon(path0+'/icons/list.png'), 'Hide', self)
+        hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
 
@@ -159,10 +188,10 @@ class ApplicationWindow(QMainWindow):
         fluxLayout = QVBoxLayout()
         fluxWidget.setLayout(fluxLayout)
 
-        radecLayout.addWidget(sc)
+        radecLayout.addWidget(self.pc)
         radecLayout.addWidget(self.mpl_toolbar)
         radecLayout.addWidget(self.tb)
-        fluxLayout.addWidget(dc)
+        fluxLayout.addWidget(self.fc)
         fluxLayout.addWidget(self.mpl_toolbar2)
         fluxLayout.addWidget(self.sb)
 
@@ -196,6 +225,7 @@ class ApplicationWindow(QMainWindow):
         QtWidgets.QMessageBox.about(self, "About", message)
 
     def addObs(self, fileGroupId):
+        from fifitools import readData, multiSlopes, Obs
         mask = self.fgid == fileGroupId
         selFiles = self.files[mask]
         selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
@@ -203,7 +233,20 @@ class ApplicationWindow(QMainWindow):
         print "Files selected are "
         print selFileNames
         # Check if file names already appear in previous list, otherwise append them and read/process/display relative data
-        
+        for infile in selFileNames:
+            if infile not in self.fileNames:
+                print "Reading file: ", infile
+                self.fileNames.append(infile)
+                aor, hk, gratpos, flux = readData(infile+".fits")
+                spectra = multiSlopes(flux)
+                spectrum=np.nanmedian(spectra,axis=2)
+                detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
+                obsdate, coords, offset, angle, za, altitude, wv = hk
+                self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
+                # Create lists of spectra, nod, and file number
+                fn,nod,spectra = zip(*((o.n,o.nod,o.spec)  for o in self.obs if o.fgid == fileGroupId))
+                # Display the data
+                self.fc.updateFigure(nod,fn,spectra)
 
 """ Main code """
         

@@ -10,7 +10,7 @@ def exploreDirectory(path):
     import numpy as np
 
     print "path is ",path    
-    files = sorted(glob.glob(path+'*.fits'), key=os.path.getctime)
+    files = sorted(glob.glob(path+'*sw.fits'), key=os.path.getctime)
     files = np.array(files)
 
     # Wavelenghts
@@ -37,70 +37,66 @@ def exploreDirectory(path):
 def readData(fitsfile):
     from astropy.io import fits
     import numpy as np
-    try:
-        hdulist = fits.open(fitsfile)
-        scidata = hdulist[1].data
-        header = hdulist[0].header
-        data = scidata.DATA
-        hdulist.close()
-        procstat = header['PROCSTAT']
-    except:
-        print "File is not correct"
-        exit
+
+    hdulist = fits.open(fitsfile)
+    scidata = hdulist[1].data
+    header = hdulist[0].header
+    data = scidata.DATA
+    hdulist.close()
+    procstat = header['PROCSTAT']
     if procstat != 'LEVEL_1':
         print "This program works only with raw FIFI-LS files (Level 1)"    
         exit
+    else:
+        detchan = header['DETCHAN']
+        obsdate = header['DATE-OBS']
+        dichroic = header['DICHROIC']
+        if detchan == 'RED':
+            wvc = header['G_WAVE_R']
+            ncycles = header['C_CYC_R']
+            start = header['G_STRT_R']
+            step = header['G_SZUP_R']
+            ngrat = header['G_PSUP_R']
+            order = 1
+        else:
+            wvc = header['G_WAVE_B']
+            ncycles = header['C_CYC_B']
+            start = header['G_STRT_B']
+            step = header['G_SZUP_B']
+            ngrat = header['G_PSUP_B']
+            order = header['G_ORD_B']
 
-    detchan = header['DETCHAN']
-    obsdate = header['DATE-OBS']
-    dichroic = header['DICHROIC']
-    if detchan == 'RED':
-        wvc = header['G_WAVE_R']
-        ncycles = header['C_CYC_R']
-        start = header['G_STRT_R']
-        step = header['G_SZUP_R']
-        ngrat = header['G_PSUP_R']
-        order = 1
-    else:
-        wvc = header['G_WAVE_B']
-        ncycles = header['C_CYC_B']
-        start = header['G_STRT_B']
-        step = header['G_SZUP_B']
-        ngrat = header['G_PSUP_B']
-        order = header['G_ORD_B']
-    # obj=header['OBJECT']
-    filegpid=header['FILEGPID']    
-    nodbeam = header['NODBEAM']
-    # Position
-    xmap = header['DLAM_MAP']
-    ymap = header['DBET_MAP']
-    xoff = header['DLAM_OFF']
-    yoff = header['DBET_OFF']
-    ra   = header['OBS_LAM']
-    dec  = header['OBS_BET']
-    dx = xmap+xoff
-    dy = ymap+yoff
-    # House keeping
-    altitude = header['ALTI_STA']
-    za = header['ZA_START']
-    wv = header['WVZ_STA']
-    angle = header['TEL_ANGL']
-    filename = header['FILENAME']
-    filenum = int(filename[:5])
-    
-    data = np.float32(data)+2**15  # signed integer to float
-    data *= 3.63/65536.            # ADU to V
-    nramps = np.size(data[:,0,0])
-    if nramps < (ncycles*4*ngrat*32):
-        flux = 0
-        print "WARNING: Number of ramps does not agree with header for ",fitsfile
-    else:
-        data = data[:ncycles*4*ngrat*32,1:17,:25]
-        flux = data.reshape(ngrat,ncycles*4*32,16,25)
-    gratpos = start+step*np.arange(ngrat)
-    aor = (detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum)
-    hk  = (obsdate, (ra,dec), (dx,dy), angle, za, elevation, wv)
-    return aor, hk, gratpos, flux
+        filegpid=header['FILEGPID']    
+        nodbeam = header['NODBEAM']
+        # Position
+        xmap = header['DLAM_MAP']
+        ymap = header['DBET_MAP']
+        xoff = header['DLAM_OFF']
+        yoff = header['DBET_OFF']
+        ra   = header['OBSLAM']
+        dec  = header['OBSBET']
+        dx = xmap+xoff
+        dy = ymap+yoff
+        # House keeping
+        altitude = header['ALTI_STA']
+        za = header['ZA_START']
+        wv = header['WVZ_STA']
+        angle = header['TEL_ANGL']
+        filename = header['FILENAME']
+        filenum = int(filename[:5])            
+        data = np.float32(data)+2**15  # signed integer to float
+        data *= 3.63/65536.            # ADU to V
+        nramps = np.size(data[:,0,0])
+        if nramps < (ncycles*4*ngrat*32):
+            flux = 0
+            print "WARNING: Number of ramps does not agree with header for ",fitsfile
+        else:
+            data = data[:ncycles*4*ngrat*32,1:17,:25]
+            flux = data.reshape(ngrat,ncycles*4*32,16,25)
+            gratpos = start+step*np.arange(ngrat)
+            aor = (detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum)
+            hk  = (obsdate, (ra,dec), (dx,dy), angle, za, altitude, wv)
+        return aor, hk, gratpos, flux
 
 
 def computeSlope(data,i):
@@ -248,13 +244,15 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
 
 class Obs(object):
     """ Single observation """
-    def __init__(self,spectrum,coords,offset,angle,elevation,zenithAngle,gratingPosition):
+    def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition):
         self.spec = spectrum
         self.ra,self.dec = coords
         self.x,self.y = offset
         self.angle = angle
-        self.elevation = elevation
+        self.alt = altitude
         self.za = zenithAngle
         self.gp = gratingPosition
-    
-        
+        self.wv = waterVapor
+        self.fgid = fileGroupID
+        self.n = filenum
+        self.nod = nodbeam
