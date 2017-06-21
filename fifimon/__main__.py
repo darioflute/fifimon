@@ -23,7 +23,8 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from PyQt5.QtWidgets import (QWidget, QMainWindow, QPushButton, QMessageBox,QToolBar,QAction,QStatusBar,
                              QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter)
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread
+
 
 import os, sys
 import numpy as np
@@ -81,6 +82,7 @@ class FluxCanvas(MplCanvas):
         # Build a list of 4 random integers between 0 and 10 (both inclusive)
         #l = [random.randint(0, 10) for i in range(4)]
         labels = []
+        print "Number of obs is: ", len(fn)
         for i in np.arange(len(fn)):
             if nod[i] == 'A':
                 c = 'blue'
@@ -95,6 +97,8 @@ class FluxCanvas(MplCanvas):
         plt.xticks((np.arange(len(fn))+0.5)*coverage, labels, rotation='vertical',fontsize=15)
         self.axes.yaxis.grid(True)
         self.axes.autoscale(enable=True,axis='y')
+        if i*coverage > 400:
+            self.axes.autoscale(enable=True, axis='x')
         self.draw()
 
 class myListWidget(QListWidget):
@@ -116,7 +120,7 @@ class myListWidget(QListWidget):
 class ApplicationWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.setAttribute(Qt.WA_DeleteOnClose)
         #        self.setWindowTitle("application main window")
         path0 = sys.path[0]
 
@@ -136,7 +140,7 @@ class ApplicationWindow(QMainWindow):
         # Menu
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.fileQuit,
-                                 QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
+                                 Qt.CTRL + Qt.Key_Q)
         self.menuBar().addMenu(self.file_menu)
 
         self.help_menu = QtWidgets.QMenu('&Help', self)
@@ -156,7 +160,7 @@ class ApplicationWindow(QMainWindow):
         # Actions
         exitAction = QAction(QIcon(path0+'/icons/exit24.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
-        exitAction.triggered.connect(qApp.quit)
+        exitAction.triggered.connect(self.close)
         hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
@@ -226,6 +230,8 @@ class ApplicationWindow(QMainWindow):
 
     def addObs(self, fileGroupId):
         from fifitools import readData, multiSlopes, Obs
+        import os
+        import psutil
         mask = self.fgid == fileGroupId
         selFiles = self.files[mask]
         selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
@@ -233,31 +239,42 @@ class ApplicationWindow(QMainWindow):
         print "Files selected are "
         print selFileNames
         # Check if file names already appear in previous list, otherwise append them and read/process/display relative data
+
         for infile in selFileNames:
             if infile not in self.fileNames:
                 print "Reading file: ", infile
                 self.fileNames.append(infile)
                 aor, hk, gratpos, flux = readData(infile+".fits")
                 spectra = multiSlopes(flux)
-                spectrum=np.nanmedian(spectra,axis=2)
+                spectrum = np.nanmedian(spectra,axis=2)
                 detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                 obsdate, coords, offset, angle, za, altitude, wv = hk
                 self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
                 # Create lists of spectra, nod, and file number
                 fn,nod,spectra = zip(*((o.n,o.nod,o.spec)  for o in self.obs if o.fgid == fileGroupId))
                 # Display the data
+                print "Displaying data ..."
                 self.fc.updateFigure(nod,fn,spectra)
+                QApplication.processEvents()
+                pid = os.getpid()
+                py = psutil.Process(pid)
+                memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
+                print('memory use:', memoryUse)
 
+
+                
 """ Main code """
         
-if __name__ == '__main__':
-    qApp = QApplication(sys.argv)
-
-    screen_resolution = qApp.desktop().screenGeometry()
+def main():
+    app = QApplication(sys.argv)
+    screen_resolution = app.desktop().screenGeometry()
     width, height = screen_resolution.width(), screen_resolution.height()
     aw = ApplicationWindow()
     aw.setGeometry(100, 100, width*0.9, width*0.35)
     progname = 'FIFI Monitor'
     aw.setWindowTitle("%s" % progname)
     aw.show()
-    sys.exit(qApp.exec_())
+    app.exec_()
+
+if __name__ == '__main__':
+    main()

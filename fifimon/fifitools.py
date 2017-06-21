@@ -99,70 +99,100 @@ def readData(fitsfile):
         return aor, hk, gratpos, flux
 
 
-def computeSlope(data,i):
+            
+
+def computeSlope(i,data):
     ''' Module called by  multiSlope to compute a ramp slope '''   
     from lmfit.models import LinearModel
     import numpy as np
     ds = np.shape(data)
     ng = ds[0]
-    i1=i%ng
-    i2=i/25/5
-    i3=(i/5)%25
-    ramps = data[i1,:,i2,i3]
-    # Reorganize them in groups of 32
-    nramps = np.size(ramps)/32
-    ramps = ramps.reshape(nramps,32)
-    # select ramps
-    ramp1 = ramps[1::4,:]
-    ramp3 = ramps[3::4,:]
-    # mask saturated values
-    satlim = 2.7
-    m1 = ramp1 > satlim
-    ramp1[m1] = np.nan
-    m3 = ramp3 > satlim
-    ramp3[m3] = np.nan
-    # Differential ramps
-    ramp = ramp1-ramp3
-    # Condense ramp
-    y = np.nanmedian(ramp,axis=0)
-    # mask 1st value
-    y[0]=np.nan
-    dtime = 1./250.  ## 250 Hz
-    x = dtime * np.arange(32)
-    # mask ramp
-    mask = np.isfinite(y)
-    # Linear part
-    base = LinearModel()
-    if np.sum(mask) > 10:  # At least 10 points to fit a line
-        pars = base.guess(y[mask],x=x[mask])
-        out = base.fit(y[mask],pars,x=x[mask])
-        slope =out.params['slope'].value
-    else:
-        slope = np.nan
-    return i,slope
+    #i1=i%ng
+    #i2=i/25/5
+    #i3=(i/5)%25
+
+    #i2 = i / 25
+    #i3 = i % 25
+    i3 = i
+    slopes = []
+    for i1 in range(ng):
+        for i2 in range(16):
+            ramps = data[i1,:,i2]
+            # Reorganize them in groups of 32
+            nramps = np.size(ramps)/32
+            ramps = ramps.reshape(nramps,32)
+            # select ramps
+            ramp1 = ramps[1::4,:]
+            ramp3 = ramps[3::4,:]
+            # mask saturated values
+            satlim = 2.7
+            m1 = ramp1 > satlim
+            ramp1[m1] = np.nan
+            m3 = ramp3 > satlim
+            ramp3[m3] = np.nan
+            # Differential ramps
+            ramp = ramp1-ramp3
+            # Condense ramp
+            m = np.isfinite(ramp)
+            if np.sum(m) > 0:
+                y = np.nanmedian(ramp,axis=0)
+                # mask 1st value
+                y[0]=np.nan
+                dtime = 1./250.  ## 250 Hz
+                x = dtime * np.arange(32)
+                # mask ramp
+                mask = np.isfinite(y)
+                # Linear part
+                if np.sum(mask) > 10:  # At least 10 points to fit a line
+                    base = LinearModel()
+                    pars = base.guess(y[mask],x=x[mask])
+                    out = base.fit(y[mask],pars,x=x[mask])
+                    slopes.append(out.params['slope'].value)
+                else:
+                    slopes.append(np.nan)
+            else:
+                slopes.append(np.nan)
+    return i,slopes
+    
+        
+def collectResults(results):
+    results.extend(results)    
 
 def multiSlopes(data):
     ''' Compute slopes for each pixel and grating position using multiprocessing '''    
     import multiprocessing as mp
     import numpy as np
     from fifitools import computeSlope
+    #    import time
+    #import os
+    #os.system("taskset -p 0xff %d" % os.getpid())
 
+#    start = time.time()
     ds = np.shape(data)
+    #arrD = mp.RawArray(ctypes.c_double,ds[0]*ds[1]*ds[2]*ds[3])
+
     ng = ds[0]
     ncpu = mp.cpu_count()
+    print "ncpu ", ncpu
     pool = mp.Pool(processes=ncpu)
-    results = [pool.apply_async(computeSlope, args=(data,i)) for i in range(ng*16*25)]
-    results = [p.get() for p in results]
-    results.sort()
-    
+    res = [pool.apply_async(computeSlope, args=(i,data[:,:,:,i])) for i in range(25)]
+    results = [p.get() for p in res]
+    pool.terminate() # Kill the pool once terminated (otherwise stays in memory)
+    #results.sort()   not needed ...
+        
     spectra = np.zeros((ng,16,25))
     for r in results:
         i = r[0]
-        i1=i%5
-        i2=i/25/5
-        i3=(i/5)%25
-        spectra[i1,i2,i3] = r[1]
+        #i1=i%5
+        #i2=i/25/5
+        #i3=(i/5)%25
+        #i2 = i / 25
+        #i3 = i % 25
+        slopes = r[1]
+        for ig in range(ng):
+            spectra[ig,:,i] = slopes[ig*16:(ig+1)*16]
 
+    print "spectra computed by multiprocessing"
     return spectra
 
 def waveCal(gratpos,dichroic,obsdate,array,order):
