@@ -9,7 +9,7 @@ def exploreDirectory(path):
     import os, glob
     import numpy as np
 
-    print "path is ",path    
+#    print "path is ",path    
     files = sorted(glob.glob(path+'*sw.fits'), key=os.path.getctime)
     files = np.array(files)
 
@@ -69,12 +69,12 @@ def readData(fitsfile):
         filegpid=header['FILEGPID']    
         nodbeam = header['NODBEAM']
         # Position
-        xmap = header['DLAM_MAP']
-        ymap = header['DBET_MAP']
-        xoff = header['DLAM_OFF']
-        yoff = header['DBET_OFF']
-        ra   = header['OBSLAM']
-        dec  = header['OBSBET']
+        xmap = float(header['DLAM_MAP'])
+        ymap = float(header['DBET_MAP'])
+        xoff = float(header['DLAM_OFF'])
+        yoff = float(header['DBET_OFF'])
+        ra   = float(header['OBSLAM'])
+        dec  = float(header['OBSBET'])
         dx = xmap+xoff
         dy = ymap+yoff
         # House keeping
@@ -276,8 +276,11 @@ class Obs(object):
     """ Single observation """
     def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition):
         self.spec = spectrum
-        self.ra,self.dec = coords
-        self.x,self.y = offset
+        self.ra = coords[0]
+        print "self.ra is ", self.ra
+        self.dec = coords[1]
+        self.x = offset[0]
+        self.y = offset[1]
         self.angle = angle
         self.alt = altitude
         self.za = zenithAngle
