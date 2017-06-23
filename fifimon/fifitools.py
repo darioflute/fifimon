@@ -8,7 +8,8 @@ def exploreDirectory(path):
     from astropy.io import fits
     import os, glob
     import numpy as np
-
+    from datetime import datetime
+    
 #    print "path is ",path    
     files = sorted(glob.glob(path+'*sw.fits'), key=os.path.getctime)
     files = np.array(files)
@@ -23,15 +24,21 @@ def exploreDirectory(path):
             h = hlf[0].header
             proc = h['PROCSTAT']
             if proc == 'LEVEL_1':
-                start.append(h['FIFISTRT'])
+                start.append(h['DATE-OBS'])
                 fgid.append(h['FILEGPID'])
         except:
             pass
         hlf.close()
 
     start=np.array(start)
-    fgid =np.array(fgid)    
-    return files, start, fgid
+    fgid =np.array(fgid)
+
+    # Ideally I should order by date and time, now only by time
+    a = [datetime.strptime(s, '%Y-%m-%dT%H:%M:%S').time() for s in start]
+    a = np.array(a)
+    s = np.argsort(a)
+    
+    return files[s], start[s], fgid[s]
 
 
 def readData(fitsfile):
@@ -75,13 +82,13 @@ def readData(fitsfile):
         yoff = float(header['DBET_OFF'])
         ra   = float(header['OBSLAM'])
         dec  = float(header['OBSBET'])
-        dx = xmap+xoff
-        dy = ymap+yoff
+        dx = (xmap+xoff)/3600.
+        dy = (ymap+yoff)/3600.
         # House keeping
         altitude = header['ALTI_STA']
         za = header['ZA_START']
         wv = header['WVZ_STA']
-        angle = header['TEL_ANGL']
+        angle = header['DET_ANGL']
         filename = header['FILENAME']
         filenum = int(filename[:5])            
         data = np.float32(data)+2**15  # signed integer to float
@@ -277,7 +284,6 @@ class Obs(object):
     def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition):
         self.spec = spectrum
         self.ra = coords[0]
-        print "self.ra is ", self.ra
         self.dec = coords[1]
         self.x = offset[0]
         self.y = offset[1]

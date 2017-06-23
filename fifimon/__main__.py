@@ -10,7 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 rcParams['font.family']='STIXGeneral'
-rcParams['font.size']=15
+rcParams['font.size']=13
 rcParams['mathtext.fontset']='stix'
 rcParams['legend.numpoints']=1
 
@@ -53,37 +53,80 @@ class MplCanvas(FigureCanvas):
 class PositionCanvas(MplCanvas):
     """Simple canvas with a sine plot."""
     
-    def compute_initial_figure(self):
+    def compute_initial_figure(self,ra=None,dec=None):
         from astropy.wcs import WCS
         self.w = WCS(naxis=2)
         self.w.wcs.ctype=["RA---TAN","DEC--TAN"]
         self.w.wcs.crpix=[1,1]
-        self.w.wcs.crval=[10,10]
-#        self.axes = self.fig.add_subplot(111, projection=self.w)
-#        #        self.axes.set_xlim([0,20*20]) # Set at least 20 observations
-        self.axes = self.fig.add_subplot(111, projection=self.w)
-        self.axes.coords[0].set_major_formatter('hh:mm:ss')
-#        t = np.array([np.nan])
-#        s = np.array([np.nan])
-        self.axes.plot(np.nan,np.nan,'ro')
+        self.w.wcs.cdelt = np.array([1,1])
+        self.w.wcs.pc[0]=[1,0]
+        self.w.wcs.pc[1]=[-0,1]
+        #self.w.wcs.naxis1=1000
+        #self.w.wcs.naxis2=1000
+        self.w.wcs.cunit=['deg','deg']
+        if ra == None:
+            ra = 0
+        if dec == None:
+            dec = 0
+        self.fig.clear()
+        self.w.wcs.crval=[ra,dec]
+        #        self.axes = self.fig.add_subplot(111, projection=self.w)
+        #        #        self.axes.set_xlim([0,20*20]) # Set at least 20 observations
 
-    def updateFigure(self, nod, ra, dec, dx, dy):
-        print "type ",type(ra)    
+        self.axes = self.fig.add_subplot(111, projection=self.w)
+        self.t = self.axes.get_transform(self.w)
+        self.axes.axis('equal')
+        self.axes.coords[0].set_major_formatter('hh:mm:ss')
+        self.axes.plot(np.nan,np.nan)
+
+    def updateFigure(self, nod, ra, dec, dx, dy, angle):
         n = len(nod)
-        print "numbers of nods ", n
         i = n-1
         ra=np.asarray(ra)
         dec=np.asarray(dec)
         dx=np.asarray(dx)
         dy=np.asarray(dy)
-        x = ra+dx/3600.
-        y = dec+dy/3600.
-        if nod[i] == 'A':
-            c = 'blue'
-        else:
-            c = 'red'
-        self.axes.plot(x[i],y[i],'o',color=c)
+        x = ra+dx-self.w.wcs.crval[0]
+        y = dec+dy-self.w.wcs.crval[1]
+        colors = ['blue' if a =='A' else 'red' for a in nod]
         self.axes.autoscale(enable=True, axis='both')
+        self.axes.scatter(x,y,facecolors='none',edgecolors='none',marker=(4,0,angle[0]),s=0,transform=self.t)
+        self.axes.clear()
+        # Get new limits
+        x0,y0 = self.axes.transAxes.transform(([0,0]))
+        x1,y1 = self.axes.transAxes.transform(([1,1]))
+        xl0,xl1 = self.axes.get_xlim()
+        yl0,yl1 = self.axes.get_ylim()
+        x2p = (x1-x0)/(xl0-xl1)
+        #y2p = (y1-y0)/(yl1-yl0)
+
+
+        bbox = self.axes.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
+        width, height = bbox.width, bbox.height
+        print 'height is: ',height
+        print 'delta y is: ',yl1-yl0
+        y2p = height*72/(yl1-yl0)*self.axes.get_data_ratio()  # from data to points (heights in inch, 72 points per inch)
+
+        print 'pixels ',self.fig.dpi*height,yl1-yl0
+        # Adjust marker size 1 arcmin for red, 1/2 arcmin for blue
+        radiant = np.pi/180.
+        theta = (angle[0]+45.)*radiant
+        fact = np.sin(theta)+np.cos(theta)
+        size = (0.5/60.*y2p*fact)**2
+        deltay = (yl1-yl0)*3600.
+        
+        size = (30./deltay * height*72 *self.axes.get_data_ratio()*fact)**2
+        print "size ",size
+        # size should be in points^2, a points is 1/72 of an inch
+        self.axes.scatter(x,y,facecolors='none',edgecolors=colors,marker=(4,0,45+angle[0]),s=size,transform=self.t)
+        self.axes.scatter(x[i],y[i],facecolors='none',edgecolors='green',marker=(4,0,45+angle[0]),s=size,transform=self.t)
+
+
+        # Invert x axis
+        xlim = self.axes.get_xlim()
+        if xlim[0] < xlim[1]:
+            self.axes.set_xlim([xlim[1],xlim[0]])
+
         self.draw()
 
 class FluxCanvas(MplCanvas):
@@ -109,16 +152,6 @@ class FluxCanvas(MplCanvas):
         # Build a list of 4 random integers between 0 and 10 (both inclusive)
         #l = [random.randint(0, 10) for i in range(4)]
         n = len(nod)
-        print "Number of obs is: ", n
-        # for i in np.arange(n):
-        #     if nod[i] == 'A':
-        #         c = 'blue'
-        #     else:
-        #         c = 'red'
-        #     s = spec[i]
-        #     for j in np.arange(ng):
-        #         self.axes.plot(sp16+i*coverage+j*0.5, s[j,:], color=c)
-        #    self.axes.axvline(i*coverage, color='gray', linewidth=0.2)
 
         i = n-1
         if nod[i] == 'A':
@@ -137,7 +170,7 @@ class FluxCanvas(MplCanvas):
         labels = np.array(fn, dtype='str')    
         #plt.xticks((np.arange(len(fn))+0.5)*coverage, labels, rotation='vertical',fontsize=15)
         self.axes.set_xticks((np.arange(len(fn))+0.5)*coverage)
-        self.axes.set_xticklabels(labels,rotation=90,ha='center',fontsize=15)
+        self.axes.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
 
         self.draw()
 
@@ -289,17 +322,29 @@ class ApplicationWindow(QMainWindow):
         from fifitools import readData, multiSlopes, Obs
         import os
         import psutil
+        firstRun = 0
         if fileGroupId != None:
             self.fileGroupId = fileGroupId
-        print "selected file group id is: ", self.fileGroupId
+            firstRun = 1
+
+            
+        #print "selected file group id is: ", self.fileGroupId
         mask = self.fgid == self.fileGroupId
         selFiles = self.files[mask]
         selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
         selFileNames = np.array(selFileNames)
-        print "Files selected are "
-        print selFileNames
+        #print "Files selected are "
+        #print selFileNames
         # Check if file names already appear in previous list, otherwise append them and read/process/display relative data
 
+        if firstRun:
+            # Grab RA-Dec of first file and restart the WCS
+            aor, hk, gratpos, flux = readData(selFileNames[0]+".fits")
+            obsdate, coords, offset, angle, za, altitude, wv = hk
+            self.pc.compute_initial_figure(coords[0],coords[1])
+
+
+        
         for infile in selFileNames:
             if infile not in self.fileNames:
                 print "Reading file: ", infile
@@ -309,23 +354,17 @@ class ApplicationWindow(QMainWindow):
                 spectrum = np.nanmedian(spectra,axis=2)
                 detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                 obsdate, coords, offset, angle, za, altitude, wv = hk
-                print "number of objects is ", len(self.obs)
                 self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
                 # Create lists of spectra, nod, positions, and file numbers
-                fn,nod,ra,dec,x,y,spectra = zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.spec)  for o in self.obs if o.fgid == self.fileGroupId))
+                fn,nod,ra,dec,x,y,angle,spectra = zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec)  for o in self.obs if o.fgid == self.fileGroupId))
                 # Display the data
-                print "Displaying data ..."
                 self.fc.updateFigure(nod,fn,spectra)
-                print "ra is ", ra
-                print "x is ", x
-                print "nod is ", nod
-                print "fn is ", fn
-                self.pc.updateFigure(nod,ra,dec,x,y)
+                self.pc.updateFigure(nod,ra,dec,x,y,angle)
                 QApplication.processEvents()
                 pid = os.getpid()
                 py = psutil.Process(pid)
-                memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
-                print('memory use:', memoryUse)
+                #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
+                #print('memory use:', memoryUse)
 
     def update_fifimon(self):
         '''
