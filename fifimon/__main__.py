@@ -15,7 +15,7 @@ rcParams['mathtext.fontset']='stix'
 rcParams['legend.numpoints']=1
 
 # Make sure that we are using QT5
-matplotlib.use('Qt5Agg')
+#matplotlib.use('Qt5Agg')
 from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
