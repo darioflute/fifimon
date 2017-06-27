@@ -15,7 +15,7 @@ rcParams['mathtext.fontset']='stix'
 rcParams['legend.numpoints']=1
 
 # Make sure that we are using QT5
-matplotlib.use('Qt5Agg')
+#matplotlib.use('Qt5Agg')
 from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -93,40 +93,27 @@ class PositionCanvas(MplCanvas):
         self.axes.scatter(x,y,facecolors='none',edgecolors='none',marker=(4,0,angle[0]),s=0,transform=self.t)
         self.axes.clear()
         # Get new limits
-        x0,y0 = self.axes.transAxes.transform(([0,0]))
-        x1,y1 = self.axes.transAxes.transform(([1,1]))
-        xl0,xl1 = self.axes.get_xlim()
+        #x0,y0 = self.axes.transAxes.transform(([0,0]))
+        #x1,y1 = self.axes.transAxes.transform(([1,1]))
+        #xl0,xl1 = self.axes.get_xlim()
         yl0,yl1 = self.axes.get_ylim()
-        x2p = (x1-x0)/(xl0-xl1)
-        #y2p = (y1-y0)/(yl1-yl0)
-
-
         bbox = self.axes.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
         width, height = bbox.width, bbox.height
-        print 'height is: ',height
-        print 'delta y is: ',yl1-yl0
-        y2p = height*72/(yl1-yl0)*self.axes.get_data_ratio()  # from data to points (heights in inch, 72 points per inch)
-
-        print 'pixels ',self.fig.dpi*height,yl1-yl0
-        # Adjust marker size 1 arcmin for red, 1/2 arcmin for blue
+        # The size of the marker is the side of a square circumscribing the rotated square
         radiant = np.pi/180.
         theta = (angle[0]+45.)*radiant
         fact = np.sin(theta)+np.cos(theta)
-        size = (0.5/60.*y2p*fact)**2
         deltay = (yl1-yl0)*3600.
-        
-        size = (30./deltay * height*72 *self.axes.get_data_ratio()*fact)**2
-        print "size ",size
+        # Adjust marker size 1 arcmin for red, 30 arcsec for blue
         # size should be in points^2, a points is 1/72 of an inch
+        size = (30./deltay * height*72 *self.axes.get_data_ratio()*fact)**2
         self.axes.scatter(x,y,facecolors='none',edgecolors=colors,marker=(4,0,45+angle[0]),s=size,transform=self.t)
         self.axes.scatter(x[i],y[i],facecolors='none',edgecolors='green',marker=(4,0,45+angle[0]),s=size,transform=self.t)
-
-
         # Invert x axis
         xlim = self.axes.get_xlim()
         if xlim[0] < xlim[1]:
             self.axes.set_xlim([xlim[1],xlim[0]])
-
+        # Update figure
         self.draw()
 
 class FluxCanvas(MplCanvas):
@@ -139,6 +126,7 @@ class FluxCanvas(MplCanvas):
     #    timer.start(3000)
 
     def compute_initial_figure(self):
+        self.fig.clear()
         self.axes = self.fig.add_subplot(111)
         self.axes.set_xlim([0,20*20]) # Set at least 20 observations
         self.axes.set_ylabel('Flux [V/s]')
@@ -149,18 +137,16 @@ class FluxCanvas(MplCanvas):
         ng = (np.shape(spec))[1]
         coverage = 16+0.5*ng
         sp16 = np.arange(16)
-        # Build a list of 4 random integers between 0 and 10 (both inclusive)
-        #l = [random.randint(0, 10) for i in range(4)]
         n = len(nod)
-
         i = n-1
+        colors = ['blue' if a =='A' else 'red' for a in nod]
         if nod[i] == 'A':
             c = 'blue'
         else:
             c = 'red'
         s = spec[i]
         for j in np.arange(ng):
-            self.axes.plot(sp16+i*coverage+j*0.5, s[j,:], color=c)
+            self.axes.plot(sp16+i*coverage+j*0.5, s[j,:], color=colors[i])
         self.axes.axvline(i*coverage, color='gray', linewidth=0.2)            
         self.axes.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
         self.axes.yaxis.grid(True)
@@ -326,7 +312,6 @@ class ApplicationWindow(QMainWindow):
         if fileGroupId != None:
             self.fileGroupId = fileGroupId
             firstRun = 1
-
             
         #print "selected file group id is: ", self.fileGroupId
         mask = self.fgid == self.fileGroupId
@@ -342,7 +327,8 @@ class ApplicationWindow(QMainWindow):
             aor, hk, gratpos, flux = readData(selFileNames[0]+".fits")
             obsdate, coords, offset, angle, za, altitude, wv = hk
             self.pc.compute_initial_figure(coords[0],coords[1])
-
+            # Clear the plot
+            self.fc.compute_initial_figure()
 
         
         for infile in selFileNames:
@@ -355,16 +341,17 @@ class ApplicationWindow(QMainWindow):
                 detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                 obsdate, coords, offset, angle, za, altitude, wv = hk
                 self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
-                # Create lists of spectra, nod, positions, and file numbers
-                fn,nod,ra,dec,x,y,angle,spectra = zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec)  for o in self.obs if o.fgid == self.fileGroupId))
-                # Display the data
-                self.fc.updateFigure(nod,fn,spectra)
-                self.pc.updateFigure(nod,ra,dec,x,y,angle)
                 QApplication.processEvents()
-                pid = os.getpid()
-                py = psutil.Process(pid)
-                #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
-                #print('memory use:', memoryUse)
+            # Create lists of spectra, nod, positions, and file numbers
+            fn,nod,ra,dec,x,y,angle,spectra = zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec)  for o in self.obs if o.fgid == self.fileGroupId))
+            # Display the data
+            self.fc.updateFigure(nod,fn,spectra)
+            self.pc.updateFigure(nod,ra,dec,x,y,angle)
+            # Used memory check
+            #pid = os.getpid()
+            #py = psutil.Process(pid)
+            #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
+            #print('memory use:', memoryUse)
 
     def update_fifimon(self):
         '''
