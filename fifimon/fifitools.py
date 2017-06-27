@@ -180,7 +180,7 @@ def multiSlopes(data):
 
     ng = ds[0]
     ncpu = mp.cpu_count()
-    print "ncpu ", ncpu
+#    print "ncpu ", ncpu
     pool = mp.Pool(processes=ncpu)
     res = [pool.apply_async(computeSlope, args=(i,data[:,:,:,i])) for i in range(25)]
     results = [p.get() for p in res]
@@ -199,7 +199,7 @@ def multiSlopes(data):
         for ig in range(ng):
             spectra[ig,:,i] = slopes[ig*16:(ig+1)*16]
 
-    print "spectra computed by multiprocessing"
+#    print "spectra computed by multiprocessing"
     return spectra
 
 def waveCal(gratpos,dichroic,obsdate,array,order):

@@ -28,7 +28,11 @@ from PyQt5.QtCore import Qt, QThread, QTimer
 
 import os, sys
 import numpy as np
-old_settings = np.seterr(all='ignore')  # Avoid warning messages
+#old_settings = np.seterr(all='ignore')  # Avoid warning messages
+import warnings
+#with warnings.catch_warnings():
+#    warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+warnings.filterwarnings('ignore')
 
 class MplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
