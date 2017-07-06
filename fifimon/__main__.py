@@ -196,6 +196,25 @@ class ApplicationWindow(QMainWindow):
         #        self.setWindowTitle("application main window")
         path0 = sys.path[0]
 
+        # Background color
+        self.setStyleSheet("""
+        QMainWindow {
+        background-color: 'lemon chiffon';
+        }
+        QMenu {
+        background-color: 'light goldenrod yellow';
+        color: 'black';
+        }
+        QMenuBar {
+        background-color: 'light goldenrod yellow';
+        }
+        """)
+        # Set window background color
+#        self.setAutoFillBackground(True)
+#        p = self.palette()
+#        p.setColor(self.backgroundRole(), Qt.white)
+#        self.setPalette(p)
+        
         # Start exploring directory
         from fifitools import exploreDirectory
         cwd = os.getcwd()
@@ -231,7 +250,7 @@ class ApplicationWindow(QMainWindow):
         self.mpl_toolbar2 = NavigationToolbar(self.fc, self)
 
         # Actions
-        exitAction = QAction(QIcon(path0+'/icons/exit24.png'), 'Exit', self)
+        exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(self.close)
         hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
@@ -304,7 +323,8 @@ class ApplicationWindow(QMainWindow):
         self.fileQuit()
 
     def about(self):
-        file=open("copyright.txt","r")
+        path0 = sys.path[0]
+        file=open(path0+"/copyright.txt","r")
         message=file.read()
         QtWidgets.QMessageBox.about(self, "About", message)
 
