@@ -474,7 +474,7 @@ class ApplicationWindow(QMainWindow):
         background-color: '#F2D388';
         }
         QToolBar{
-        background: transparent;
+        background: '#FFF6BA';
         }
         """)
         # Set window background color
