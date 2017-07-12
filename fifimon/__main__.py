@@ -473,6 +473,9 @@ class ApplicationWindow(QMainWindow):
         QStatusBar {
         background-color: '#F2D388';
         }
+        QToolBar{
+        background: transparent;
+        }
         """)
         # Set window background color
 #        self.setAutoFillBackground(True)
