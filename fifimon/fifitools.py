@@ -85,9 +85,12 @@ def readData(fitsfile):
         dx = (xmap+xoff)/3600.
         dy = (ymap+yoff)/3600.
         # House keeping
-        altitude = header['ALTI_STA']
-        za = header['ZA_START']
-        wv = header['WVZ_STA']
+        alti_sta = header['ALTI_STA']
+        alti_end = header['ALTI_END']
+        za_sta = header['ZA_START']
+        za_end = header['ZA_END']
+        wv_sta = header['WVZ_STA']
+        wv_end = header['WVZ_END']
         angle = header['DET_ANGL']
         filename = header['FILENAME']
         filenum = int(filename[:5])            
@@ -102,7 +105,7 @@ def readData(fitsfile):
             flux = data.reshape(ngrat,ncycles*4*32,16,25)
             gratpos = start+step*np.arange(ngrat)
             aor = (detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum)
-            hk  = (obsdate, (ra,dec), (dx,dy), angle, za, altitude, wv)
+            hk  = (obsdate, (ra,dec), (dx,dy), angle, (za_sta,za_end), (alti_sta,alti_end), (wv_sta,wv_end))
         return aor, hk, gratpos, flux
 
 

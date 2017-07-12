@@ -14,6 +14,7 @@ rcParams['font.size']=13
 rcParams['mathtext.fontset']='stix'
 rcParams['legend.numpoints']=1
 from matplotlib.patches import Rectangle
+from matplotlib import collections  as mc
 
 # Make sure that we are using QT5
 #matplotlib.use('Qt5Agg')
@@ -22,7 +23,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtWidgets import (QWidget, QMainWindow, QPushButton, QMessageBox,QToolBar,QAction,QStatusBar,
-                             QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter)
+                             QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu)
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QThread, QTimer
 
@@ -174,6 +175,7 @@ class FluxCanvas(MplCanvas):
         self.cidmotion = self.fig.canvas.mpl_connect('motion_notify_event', self.onMotion)
         self.picRelease = self.fig.canvas.mpl_connect('button_release_event', self.onRelease)
 
+        
         # Factor controlling the width of the figure
         self.w = 10
         self.dragged = None
@@ -189,15 +191,15 @@ class FluxCanvas(MplCanvas):
 
         modifiers = QApplication.keyboardModifiers()
         if modifiers == QtCore.Qt.ShiftModifier:
-            curr_ylim = self.axes.get_ylim()
+            curr_ylim = self.axes2.get_ylim()
             curr_y0 = (curr_ylim[0]+curr_ylim[1])*0.5
             new_height= (curr_ylim[1]-curr_ylim[0])*factor*0.5
-            self.axes.set_ylim([curr_y0-new_height,curr_y0+new_height])
+            self.axes2.set_ylim([curr_y0-new_height,curr_y0+new_height])
         else:
-            curr_xlim = self.axes.get_xlim()
+            curr_xlim = self.axes2.get_xlim()
             curr_x0 = (curr_xlim[0]+curr_xlim[1])*0.5
             new_width = (curr_xlim[1]-curr_xlim[0])*factor*0.5
-            self.axes.set_xlim([curr_x0-new_width,curr_x0+new_width])
+            self.axes2.set_xlim([curr_x0-new_width,curr_x0+new_width])
         self.draw()
 
     def onPick(self, event):
@@ -205,7 +207,44 @@ class FluxCanvas(MplCanvas):
             self.dragged = event
             self.pick_pos = (event.xdata, event.ydata)
             print "pick position: ", self.pick_pos
+        elif event.button == 3:
+            # Call popup menu to show housekeeping values (altitude, zenith angle, water vapor)
+            pass
+        else:
+            pass
 
+    def contextMenuEvent(self, event):
+        drawZA = QAction('Draw zenith angle', self)
+        drawZA.triggered.connect(self.drawZA)
+        drawAlt = QAction('Draw altitude', self)
+        drawAlt.triggered.connect(self.drawAlt)
+        drawWV = QAction('Draw water vapor', self)
+        drawWV.triggered.connect(self.drawWV)
+        menu = QMenu(self)
+        menu.addAction(drawZA)
+        menu.addAction(drawAlt)
+        menu.addAction(drawWV)
+        menu.exec_(event.globalPos())
+
+
+    def drawZA(self):
+        print "Draw zenith angle"    
+        self.displayZA ^= True
+        self.zaLayer.set_visible(self.displayZA)
+        self.draw()
+
+    def drawAlt(self):
+        self.displayAlt ^= True
+        self.altLayer.set_visible(self.displayAlt)
+        self.draw()
+        print "Draw altitude"    
+
+    def drawWV(self):
+        self.displayWV ^= True
+        self.wvLayer.set_visible(self.displayWV)
+        self.draw()
+        print "Draw water vapor"    
+        
     def onMotion(self, event):
         if self.dragged is not None and self.pick_pos[0] is not None:
             #old_pos = self.dragged.get_position()
@@ -240,16 +279,37 @@ class FluxCanvas(MplCanvas):
 
 
     def compute_initial_figure(self,fileGroupId=None):
+        # Clear figure    
         self.fig.clear()
-        self.axes = self.fig.add_subplot(111)
-        self.axes.set_xlim([0,20*20]) # Set at least 20 observations
-        self.axes.set_ylabel('Flux [V/s]')
-        self.axes.plot([0,0],[np.nan,np.nan],'.b')
+        # Initialize display
+        self.displayZA = True
+        self.displayAlt = True
+        self.displayWV = True
+        # Create box
+        self.axes1 = self.fig.add_subplot(211)
+        self.axes1.set_xlim([0,20*20]) # Set at least 20 observations
+        self.axes1.set_ylim([25,75])
+        self.axes1.set_ylabel('Zenith angle [degs]')
+        self.axes1b = self.axes1.twinx()
+        self.axes1b.set_ylim([35000,46000])
+        self.axes1b.get_yaxis().set_tick_params(labelright='on',right='on')            
+        self.axes1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
+        self.axes1b.yaxis.set_label_coords(-0.13,0.5)
+        self.axes1b.set_ylabel('Altitude [ft]',color='green')
+        self.axes1c = self.axes1.twinx()
+        self.axes1c.set_ylim([1,100])
+        self.axes1c.tick_params(labelright='on',right='on',direction='in',pad=-20,colors='orange')
+        self.axes1c.yaxis.set_label_coords(-0.11,0.5)
+        self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
+        self.axes2 = self.fig.add_subplot(212,sharex=self.axes1)
+        self.axes2.set_ylabel('Flux [V/s]')
+        self.axes2.plot([0,0],[np.nan,np.nan],'.b')
+        self.fig.subplots_adjust(hspace=0., bottom=0.1)
         if fileGroupId is not None:
             self.fig.suptitle(fileGroupId)
 
 
-    def updateFigure(self,nod,fn,spec,infile):
+    def updateFigure(self,nod,fn,spec,infile,za,alti,wv):
         # get number of grating positions
         ng = (np.shape(spec))[1]
         coverage = 16+0.5*ng
@@ -265,17 +325,52 @@ class FluxCanvas(MplCanvas):
 
         s = spec[i]
         for j in np.arange(ng):
-            self.axes.plot(sp16+i*coverage+j*0.5, s[j,:], color=colors[i])
+            self.axes2.plot(sp16+i*coverage+j*0.5, s[j,:], color=colors[i])
 
-        self.axes.axvline(i*coverage, color='gray', linewidth=0.2)            
-        self.axes.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
-        self.axes.yaxis.grid(True)
+        # clear axes 1
+        self.axes1.clear()    
+        self.axes1b.clear()    
+        self.axes1c.clear()
+        self.axes1.set_ylabel('Zenith angle [degs]')
+        self.axes1b.set_ylabel('Altitude [ft]',color='green')
+        self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
+            
+        self.axes2.axvline(i*coverage, color='gray', linewidth=0.2)            
+        self.axes2.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
+        for ii in np.arange(i+1):
+            self.axes1.axvline(ii*coverage, color='gray', linewidth=0.2)            
+        self.axes1.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
+        self.axes2.yaxis.grid(True)
         labels = np.array(fn, dtype='str')    
-        self.axes.set_xticks((np.arange(len(fn))+0.5)*coverage)
-        self.axes.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
+        self.axes2.set_xticks((np.arange(len(fn))+0.5)*coverage)
+        self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
         # Set limits around last observation
-        self.axes.set_xlim([coverage*(i-1.5*self.w),coverage*(i+0.5*self.w)]) # Set at least 20 observations
-        self.axes.autoscale(enable=True,axis='y')
+        self.axes2.set_xlim([coverage*(i-1.5*self.w),coverage*(i+0.5*self.w)]) # Set at least 20 observations
+        self.axes2.autoscale(enable=True,axis='y')
+
+        # Display curves
+        x1 = np.arange(i+1)*coverage
+        x2 = np.arange(1,i+2)*coverage
+        zalines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,za)]
+        altlines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,alti)]
+        wvlines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,wv)]
+        zamin = 32
+        zamax = 67
+        cza = ['black' if (y[0] < zamax and y[1] < zamax and y[0] > zamin and y[1] > zamin) else 'red' for y in za]
+        self.zaLayer = mc.LineCollection(zalines, colors=cza, linewidths=1)
+        self.altLayer = mc.LineCollection(altlines, colors='green', linewidths=1)
+        self.wvLayer = mc.LineCollection(wvlines, colors='orange', linewidths=1)
+
+        # clear and redraw
+        self.axes1.add_collection(self.zaLayer)
+        self.axes1b.add_collection(self.altLayer)
+        self.axes1c.add_collection(self.wvLayer)
+        
+        # Hide/show curves
+        self.altLayer.set_visible(self.displayAlt)
+        self.zaLayer.set_visible(self.displayZA)
+        self.wvLayer.set_visible(self.displayWV)
+
         self.draw()
 
     def updateFigureMedians(self,nod,fn,spec,infile):
@@ -299,34 +394,28 @@ class FluxCanvas(MplCanvas):
             n1 = int(16+ng*0.5-n0)
             x.append(i*ng+j)
             y.append(np.median(s[j,n0:n1]))
-            #            self.axes.plot(sp16+i*coverage+j*16, s[j,:], color=colors[i])
 
-        self.axes.plot(x,y,color=colors[i] )
+        self.axes2.plot(x,y,color=colors[i] )
 
-        self.axes.axvline(i*ng, color='gray', linewidth=0.2)            
-        self.axes.axvline(len(fn)*ng, color='gray', linewidth=0.2)
-        self.axes.yaxis.grid(True)
+        self.axes2.axvline(i*ng, color='gray', linewidth=0.2)            
+        self.axes2.axvline(len(fn)*ng, color='gray', linewidth=0.2)
+        self.axes2.yaxis.grid(True)
         labels = np.array(fn, dtype='str')    
-        self.axes.set_xticks((np.arange(len(fn))+0.5)*ng)
-        #self.axes.set_xticks((np.arange(len(fn))+0.5)*coverage)
-        self.axes.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
+        self.axes2.set_xticks((np.arange(len(fn))+0.5)*ng)
+        self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
         # Set limits around last observation
-        self.axes.set_xlim([ng*(i-1.5*self.w),ng*(i+0.5*self.w)]) # Set at least 20 observations
-        self.axes.autoscale(enable=True,axis='y')
+        self.axes2.set_xlim([ng*(i-1.5*self.w),ng*(i+0.5*self.w)]) # Set at least 20 observations
+        self.axes2.autoscale(enable=True,axis='y')
         self.draw()
 
 class myListWidget(QListWidget):
 
     def Clicked(self,item):
-#      QMessageBox.information(self, "ListWidget", "You clicked: "+item.text())
-        # 2000 means message erased after 2 seconds
-        #self.parent().parent().statusBar().showMessage("Clicked item "+item.text(),2000)
         mw = self.parent().parent()
+        # 2000 means message erased after 2 seconds
         mw.sb.showMessage("You selected the FileGroupID: "+item.text(),2000)
-#        self.parent().parent().lf.hide()
         mw.lf.setVisible(False)
         # Trigger event related to item list ....
-        print "item is ",item.text()
         mw.addObs(item.text())
 
 
@@ -368,17 +457,21 @@ class ApplicationWindow(QMainWindow):
         #        self.setWindowTitle("application main window")
         path0 = sys.path[0]
 
-        # Background color
+        # Background color (FFF7C0 is buttermilk, DCAE1D is honey, F2D388 is butter)
+        # Colors from https://designschool.canva.com/blog/website-color-schemes/
         self.setStyleSheet("""
         QMainWindow {
-        background-color: 'lemon chiffon';
+        background-color: '#FFF6BA';
         }
         QMenu {
-        background-color: 'light goldenrod yellow';
+        background-color: '#D8AB4E';
         color: 'black';
         }
         QMenuBar {
-        background-color: 'light goldenrod yellow';
+        background-color: '#F2D388';
+        }
+        QStatusBar {
+        background-color: '#F2D388';
         }
         """)
         # Set window background color
@@ -431,8 +524,8 @@ class ApplicationWindow(QMainWindow):
         # Toolbar
         self.tb = QToolBar()
         self.tb.setMovable(True)
-        self.tb.addAction(exitAction)
         self.tb.addAction(hideAction)
+        self.tb.addAction(exitAction)
 
         # Widget list
         self.lf = myListWidget()
@@ -458,6 +551,7 @@ class ApplicationWindow(QMainWindow):
         
         radecLayout.addWidget(self.pc)
         radecLayout.addWidget(self.mpl_toolbar)
+        radecLayout.addWidget(self.sb)
         fluxLayout.addWidget(self.fc)
 
         #fluxLayout.addWidget(self.mpl_toolbar2)
@@ -465,7 +559,6 @@ class ApplicationWindow(QMainWindow):
         toolLayout.addWidget(self.tb)
         #radecLayout.addWidget(self.tb)
         fluxLayout.addWidget(toolWidget)
-        fluxLayout.addWidget(self.sb)
 
         splitter1.addWidget(radecWidget)
         splitter1.addWidget(fluxWidget)
@@ -502,7 +595,7 @@ class ApplicationWindow(QMainWindow):
         path0 = sys.path[0]
         file=open(path0+"/copyright.txt","r")
         message=file.read()
-        QtWidgets.QMessageBox.about(self, "About", message)
+        QMessageBox.about(self, "About", message)
 
     def addObs(self, fileGroupId = None):
         from fifitools import readData, multiSlopes, Obs
@@ -548,10 +641,11 @@ class ApplicationWindow(QMainWindow):
                 # Give time to the system to update the GUI
                 QApplication.processEvents()
             # Create lists of spectra, nod, positions, and file numbers
-            fn,nod,ra,dec,x,y,angle,spectra = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec)  for o in self.obs if o.fgid == self.fileGroupId)))
+            fn,nod,ra,dec,x,y,angle,spectra,za,alti,wv = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv)
+                                                              for o in self.obs if o.fgid == self.fileGroupId)))
             # Display the data
             #print "Adding to the plot ",infile
-            self.fc.updateFigure(nod,fn,spectra,infile)
+            self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
             self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
             # Used memory check
             #pid = os.getpid()
@@ -587,7 +681,20 @@ class ApplicationWindow(QMainWindow):
                 # update fileGroupID list    
                 self.fgidList.append(fg)
                 # update widget list
-                self.lf.addItem(fg); 
+                self.lf.addItem(fg)
+                # pop-up window alerting and asking if processing the new data
+                choice = QMessageBox.question(self,
+                                              'New set of data appeared !','Do you want to show them ?',
+                                              QMessageBox.Yes | QMessageBox.No, QMessageBox.No )
+                if choice == QMessageBox.Yes:
+                    # Write on status
+                    self.sb.showMessage("You selected the FileGroupID: "+fg,2000)
+                    # Eventually hide list
+                    self.lf.setVisible(False)
+                    # Start new plot
+                    self.addObs(fg)
+                else:
+                    pass    
 
 
                 
