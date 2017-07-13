@@ -100,7 +100,8 @@ class PositionCanvas(MplCanvas):
         if dec == None:
             dec = 0
         self.fig.clear()
-        self.rects = []    
+        self.rects = []
+        self.offsets = []
         self.w.wcs.crval=[ra,dec]
         #        self.axes = self.fig.add_subplot(111, projection=self.w)
         #        #        self.axes.set_xlim([0,20*20]) # Set at least 20 observations
@@ -124,6 +125,7 @@ class PositionCanvas(MplCanvas):
         x = ra+dx-self.w.wcs.crval[0]
         y = dec+dy-self.w.wcs.crval[1]
         colors = ['blue' if a =='A' else 'red' for a in nod]
+        self.offsets.append((dx[i],dy[i]))
         
         #self.axes.scatter(x,y,facecolors='none',edgecolors='none',marker=(4,0,angle[0]),s=0,transform=self.t)
         #self.axes.clear()
@@ -160,6 +162,7 @@ class PositionCanvas(MplCanvas):
             pass
         greenrect = Rectangle((x[i] - dx, y[i] - dy), side,side,angle=-angle[i],fc='#C1FFC1',ec='none',alpha=0.5)
         self.greenpatch = self.axes.add_patch(greenrect)
+
         
         # collect the patches to modify them later
         self.rects.append(rect)
@@ -227,11 +230,16 @@ class FluxCanvas(MplCanvas):
                 self.gr2.remove()
                 self.gr1 = self.axes1.axvspan(n*self.coverage, (n+1)*self.coverage, alpha=0.5, color='#E7FFE7')
                 self.gr2 = self.axes2.axvspan(n*self.coverage, (n+1)*self.coverage, alpha=0.5, color='#E7FFE7')
-                # communicate update of position to main window
+                # update position 
                 pc = self.parent().parent().parent().parent().pc
                 rect = pc.rects[n]
                 pc.greenpatch.set_xy(rect.get_xy())
                 pc.draw()
+                # write offset in the status bar
+                offset = pc.offsets[n]
+                mw = self.parent().parent().parent().parent()
+                mw.sb.showMessage("Offset ("+"{:.0f}".format(offset[0]*3600.)+","+"{:.0f}".format(offset[1]*3600.)+")",3000)
+
         elif event.button == 2:    
             self.dragged = event
             self.pick_pos = (event.xdata, event.ydata)
@@ -516,11 +524,6 @@ class ApplicationWindow(QMainWindow):
         background: '#FFF6BA';
         }
         """)
-        # Set window background color
-#        self.setAutoFillBackground(True)
-#        p = self.palette()
-#        p.setColor(self.backgroundRole(), Qt.white)
-#        self.setPalette(p)
         
         # Start exploring directory
         from fifitools import exploreDirectory
