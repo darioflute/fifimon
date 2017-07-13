@@ -7,7 +7,7 @@ when observing.
 As they appear in the archive directory, they are processed and
 displayed to show the positions of the observation (different pointings)
 and average spectra taken. This allows one to follow the perfomance of
-the instrument with variable conditions (altitude, water vapor) to
+the instrument with variable conditions (zenithal angle, altitude, water vapor) to
 check in real time if part of the observations need to be redone in
 order to have homogeneous observations.
 
