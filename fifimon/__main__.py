@@ -37,6 +37,8 @@ import warnings
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
 
+#from multiprocessing import Process
+
 class MplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
 
@@ -109,6 +111,7 @@ class PositionCanvas(MplCanvas):
         self.axes.coords[0].set_major_formatter('hh:mm:ss')
         self.axes.plot(np.nan,np.nan)
 
+        
     def updateFigure(self, nod, fn, ra, dec, dx, dy, angle, infile):
         n = len(nod)
         # Find index of infile
@@ -150,8 +153,16 @@ class PositionCanvas(MplCanvas):
         dy = side*0.5*(np.sin(theta)+np.cos(theta))
         rect = Rectangle((x[i] - dx, y[i] - dy), side,side,angle=-angle[i],fc='none',ec=colors[i])
         patch = self.axes.add_patch(rect)
+        # Add patch on current position
+        try:
+            self.greenpatch.remove()
+        except:
+            pass
+        greenrect = Rectangle((x[i] - dx, y[i] - dy), side,side,angle=-angle[i],fc='#C1FFC1',ec='none',alpha=0.5)
+        self.greenpatch = self.axes.add_patch(greenrect)
+        
         # collect the patches to modify them later
-        self.rects.append(patch)
+        self.rects.append(rect)
         self.axes.autoscale(enable=True, axis='both')
         # Invert x axis
         xlim = self.axes.get_xlim()
@@ -203,7 +214,25 @@ class FluxCanvas(MplCanvas):
         self.draw()
 
     def onPick(self, event):
-        if event.button == 2:    
+        if event.button == 1:
+            x = event.xdata
+            # compute the position number, return if it is not defined
+            try:
+                n = int(x // self.coverage)
+            except:
+                return
+            if n >= 0 and n < self.n:
+                # draw rectangle on flux plot
+                self.gr1.remove()
+                self.gr2.remove()
+                self.gr1 = self.axes1.axvspan(n*self.coverage, (n+1)*self.coverage, alpha=0.5, color='#E7FFE7')
+                self.gr2 = self.axes2.axvspan(n*self.coverage, (n+1)*self.coverage, alpha=0.5, color='#E7FFE7')
+                # communicate update of position to main window
+                pc = self.parent().parent().parent().parent().pc
+                rect = pc.rects[n]
+                pc.greenpatch.set_xy(rect.get_xy())
+                pc.draw()
+        elif event.button == 2:    
             self.dragged = event
             self.pick_pos = (event.xdata, event.ydata)
             print "pick position: ", self.pick_pos
@@ -213,6 +242,7 @@ class FluxCanvas(MplCanvas):
         else:
             pass
 
+            
     def contextMenuEvent(self, event):
         drawZA = QAction('Draw zenith angle', self)
         drawZA.triggered.connect(self.drawZA)
@@ -312,9 +342,9 @@ class FluxCanvas(MplCanvas):
     def updateFigure(self,nod,fn,spec,infile,za,alti,wv):
         # get number of grating positions
         ng = (np.shape(spec))[1]
-        coverage = 16+0.5*ng
+        self.coverage = 16+0.5*ng
         sp16 = np.arange(16)
-        n = len(nod)
+        self.n = len(nod)
         #print fn
         i = fn.index(int(infile[:5]))
         colors = ['blue' if a =='A' else 'red' for a in nod]
@@ -325,7 +355,7 @@ class FluxCanvas(MplCanvas):
 
         s = spec[i]
         for j in np.arange(ng):
-            self.axes2.plot(sp16+i*coverage+j*0.5, s[j,:], color=colors[i])
+            self.axes2.plot(sp16+i*self.coverage+j*0.5, s[j,:], color=colors[i])
 
         # clear axes 1
         self.axes1.clear()    
@@ -335,22 +365,31 @@ class FluxCanvas(MplCanvas):
         self.axes1b.set_ylabel('Altitude [ft]',color='green')
         self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
             
-        self.axes2.axvline(i*coverage, color='gray', linewidth=0.2)            
-        self.axes2.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
+        self.axes2.axvline(i*self.coverage, color='gray', linewidth=0.2)            
+        self.axes2.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
         for ii in np.arange(i+1):
-            self.axes1.axvline(ii*coverage, color='gray', linewidth=0.2)            
-        self.axes1.axvline(len(fn)*coverage, color='gray', linewidth=0.2)
+            self.axes1.axvline(ii*self.coverage, color='gray', linewidth=0.2)            
+        self.axes1.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
         self.axes2.yaxis.grid(True)
         labels = np.array(fn, dtype='str')    
-        self.axes2.set_xticks((np.arange(len(fn))+0.5)*coverage)
+        self.axes2.set_xticks((np.arange(len(fn))+0.5)*self.coverage)
         self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
         # Set limits around last observation
-        self.axes2.set_xlim([coverage*(i-1.5*self.w),coverage*(i+0.5*self.w)]) # Set at least 20 observations
+        self.axes2.set_xlim([self.coverage*(i-1.5*self.w),self.coverage*(i+0.5*self.w)]) # Set at least 20 observations
         self.axes2.autoscale(enable=True,axis='y')
 
+        # Shade background of last position
+        try:
+            # Try removing previous shaded region
+            self.gr2.remove()
+        except:
+            pass
+        self.gr1 = self.axes1.axvspan(i*self.coverage, (i+1)*self.coverage, alpha=0.5, color='#E7FFE7')
+        self.gr2 = self.axes2.axvspan(i*self.coverage, (i+1)*self.coverage, alpha=0.5, color='#E7FFE7')
+        
         # Display curves
-        x1 = np.arange(i+1)*coverage
-        x2 = np.arange(1,i+2)*coverage
+        x1 = np.arange(i+1)*self.coverage
+        x2 = np.arange(1,i+2)*self.coverage
         zalines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,za)]
         altlines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,alti)]
         wvlines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,wv)]
@@ -361,7 +400,7 @@ class FluxCanvas(MplCanvas):
         self.altLayer = mc.LineCollection(altlines, colors='green', linewidths=1)
         self.wvLayer = mc.LineCollection(wvlines, colors='orange', linewidths=1)
 
-        # clear and redraw
+        # Redraw
         self.axes1.add_collection(self.zaLayer)
         self.axes1b.add_collection(self.altLayer)
         self.axes1c.add_collection(self.wvLayer)
@@ -376,7 +415,7 @@ class FluxCanvas(MplCanvas):
     def updateFigureMedians(self,nod,fn,spec,infile):
         # get number of grating positions
         ng = (np.shape(spec))[1]
-        coverage = 16*ng
+        self.coverage = 16*ng
         sp16 = np.arange(16)
         n = len(nod)
         i = fn.index(int(infile[:5]))
@@ -630,32 +669,37 @@ class ApplicationWindow(QMainWindow):
             # Clear the plot
             self.fc.compute_initial_figure(self.fileGroupId)
 
-        
+            
         for infile in selFileNames:
             if infile not in self.fileNames:
                 print "Reading file: ", infile
                 self.fileNames.append(infile)
                 aor, hk, gratpos, flux = readData(infile+".fits")
                 spectra = multiSlopes(flux)
+                QApplication.processEvents()
                 spectrum = np.nanmedian(spectra,axis=2)
                 detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                 obsdate, coords, offset, angle, za, altitude, wv = hk
                 self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
                 # Give time to the system to update the GUI
                 QApplication.processEvents()
-            # Create lists of spectra, nod, positions, and file numbers
-            fn,nod,ra,dec,x,y,angle,spectra,za,alti,wv = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv)
-                                                              for o in self.obs if o.fgid == self.fileGroupId)))
-            # Display the data
-            #print "Adding to the plot ",infile
-            self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
-            self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
+            self.update_figures(infile)
             # Used memory check
             #pid = os.getpid()
             #py = psutil.Process(pid)
             #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
             #print('memory use:', memoryUse)
 
+    def update_figures(self,infile):
+        # Create lists of spectra, nod, positions, and file numbers
+        fn,nod,ra,dec,x,y,angle,spectra,za,alti,wv = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv)
+                                                                     for o in self.obs if o.fgid == self.fileGroupId)))
+        # Display the data
+        #print "Adding to the plot ",infile
+        self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
+        self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
+                
+    
     def update_fifimon(self):
         '''
         This module is called automatically every n seconds (n=10, typically) to look
@@ -716,4 +760,7 @@ def main():
 
 # Ensure that the app is created once 
 if __name__ == '__main__':
+#    p = Process(target=main)
+#    p.start()
+#    p.join()
     main()
