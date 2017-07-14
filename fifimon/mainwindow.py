@@ -541,11 +541,14 @@ class ApplicationWindow(QMainWindow):
         # Menu
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.fileQuit, Qt.CTRL + Qt.Key_Q)
-        self.menuBar().addMenu(self.file_menu)
+        menubar = self.menuBar()
+        # Request for the MacOSX - do not use native menubar
+        menubar.setNativeMenuBar(False)
+        menubar.addMenu(self.file_menu)
 
         self.help_menu = QtWidgets.QMenu('&Help', self)
-        self.menuBar().addSeparator()
-        self.menuBar().addMenu(self.help_menu)
+        menubar.addSeparator()
+        menubar.addMenu(self.help_menu)
         self.help_menu.addAction('&About', self.about)
 
         # Define main widget
@@ -623,8 +626,6 @@ class ApplicationWindow(QMainWindow):
         timer = QTimer(self)
         timer.timeout.connect(self.update_fifimon)
         timer.start(3000)
-
-        
 
     def changeVisibility(self):
         state = self.lf.isVisible()
