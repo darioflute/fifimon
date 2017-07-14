@@ -12,5 +12,8 @@ setup(name='fifimon',
       download_url='https://github.com/darioflute/fifimon',
       license='GPLv3+',
       packages=['fifimon'],
-      scripts=['bin/fifimon']
+      scripts=['bin/fifimon'],
+      include_package_data=True,
+      package_data={'fifimon':['icons/*.jpg']},
+      data_files=[('fifimon',['copyright.txt'])]
      )

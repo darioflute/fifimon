@@ -502,7 +502,8 @@ class ApplicationWindow(QMainWindow):
         QMainWindow.__init__(self)
         self.setAttribute(Qt.WA_DeleteOnClose)
         #        self.setWindowTitle("application main window")
-        path0 = sys.path[0]
+        #path0 = sys.path[0]
+        path0, file0 = os.path.split(__file__)
 
         # Background color (FFF7C0 is buttermilk, DCAE1D is honey, F2D388 is butter)
         # Colors from https://designschool.canva.com/blog/website-color-schemes/
@@ -637,7 +638,8 @@ class ApplicationWindow(QMainWindow):
         self.fileQuit()
 
     def about(self):
-        path0 = sys.path[0]
+#        path0 = sys.path[0]
+        path0,file0 = os.path.split(__file__)
         file=open(path0+"/copyright.txt","r")
         message=file.read()
         QMessageBox.about(self, "About", message)
