@@ -522,6 +522,7 @@ class ApplicationWindow(QMainWindow):
         }
         QToolBar{
         background: '#FFF6BA';
+        spacing: 3px; /* spacing between items in the tool bar */
         }
         """)
         
