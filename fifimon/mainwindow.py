@@ -501,8 +501,7 @@ class ApplicationWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        #        self.setWindowTitle("application main window")
-        #path0 = sys.path[0]
+        # Get the path of the package
         path0, file0 = os.path.split(__file__)
 
         # Background color (FFF7C0 is buttermilk, DCAE1D is honey, F2D388 is butter)
@@ -638,7 +637,7 @@ class ApplicationWindow(QMainWindow):
         self.fileQuit()
 
     def about(self):
-#        path0 = sys.path[0]
+        # Get path of the package
         path0,file0 = os.path.split(__file__)
         file=open(path0+"/copyright.txt","r")
         message=file.read()
