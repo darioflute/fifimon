@@ -1,6 +1,6 @@
 Copyright 2017 -  Dario Fadda.
 
-This program allows a quickly processing and display of data obtained with FIFI-LS onboard SOFIA.
+This program allows a quick processing and display of data obtained with FIFI-LS onboard SOFIA.
 
 It can be also used for quality control of raw FIFI-LS data (level 1) in the SOFIA archive.
 
