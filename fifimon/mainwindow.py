@@ -508,21 +508,20 @@ class ApplicationWindow(QMainWindow):
         # Colors from https://designschool.canva.com/blog/website-color-schemes/
         self.setStyleSheet("""
         QMainWindow {
-        background-color: '#FFF6BA';
+        background-color: #FFF6BA;
         }
         QMenu {
-        background-color: '#D8AB4E';
+        background-color: #D8AB4E;
         color: 'black';
         }
         QMenuBar {
-        background-color: '#F2D388';
+        background-color: #F2D388;
         }
         QStatusBar {
-        background-color: '#F2D388';
+        background-color: #F2D388;
         }
-        QToolBar{
-        background: '#FFF6BA';
-        spacing: 3px; /* spacing between items in the tool bar */
+        QToolBar#tb1 {
+        background-color: #FFF6BA;
         }
         """)
         
@@ -559,6 +558,7 @@ class ApplicationWindow(QMainWindow):
         self.fc = FluxCanvas(self.main_widget, width=8, height=4, dpi=100)
         self.mpl_toolbar = NavigationToolbar(self.pc, self)
         self.mpl_toolbar.pan('on')
+        self.mpl_toolbar.setObjectName('tb1')
         self.mpl_toolbar2 = NavigationToolbar(self.fc, self)
         self.mpl_toolbar2.pan('on')
 
