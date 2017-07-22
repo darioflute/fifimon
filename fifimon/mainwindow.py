@@ -545,9 +545,6 @@ class ApplicationWindow(QMainWindow):
             self.loadData()
         except:
             pass
-        print self.fileNames
-        for o in self.obs:
-            print o.fgid
         # Menu
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.fileQuit, Qt.CTRL + Qt.Key_Q)
@@ -664,7 +661,7 @@ class ApplicationWindow(QMainWindow):
         with io.open('fifimon.json', mode='w') as f:
             str_= json.dumps(data,indent=2,sort_keys=True,
                              separators=(',',': '), ensure_ascii=False)
-            f.write(str_)
+            f.write(unicode(str_))
         pass    
 
     def loadData(self):
