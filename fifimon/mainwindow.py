@@ -537,9 +537,17 @@ class ApplicationWindow(QMainWindow):
         
         # Start list of observations
         self.fileGroupId = None
+
+        # Variables of the session
         self.fileNames = []
         self.obs = []
-        
+        try:
+            self.loadData()
+        except:
+            pass
+        print self.fileNames
+        for o in self.obs:
+            print o.fgid
         # Menu
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Quit', self.fileQuit, Qt.CTRL + Qt.Key_Q)
@@ -568,7 +576,7 @@ class ApplicationWindow(QMainWindow):
         # Actions
         exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exit', self)
         exitAction.setShortcut('Ctrl+Q')
-        exitAction.triggered.connect(self.close)
+        exitAction.triggered.connect(self.closeEvent)
         hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
@@ -634,8 +642,56 @@ class ApplicationWindow(QMainWindow):
         state = self.lf.isVisible()
         self.lf.setVisible(not state)
 
+    def saveData(self):
+        import json, io
+        data = {}
+        for fn,o in zip(self.fileNames,self.obs):
+            data[fn] = {
+                'n': o.n,
+                'ra': o.ra,
+                'dec': o.dec,
+                'x': o.x,
+                'y': o.y,
+                'angle': o.angle,
+                'alt': o.alt,
+                'za': o.za,
+                'gp': o.gp.tolist(),
+                'wv': o.wv,
+                'fgid': o.fgid,
+                'nod': o.nod,
+                'spec': o.spec.tolist()
+            }
+        with io.open('fifimon.json', mode='w') as f:
+            str_= json.dumps(data,indent=2,sort_keys=True,
+                             separators=(',',': '), ensure_ascii=False)
+            f.write(str_)
+        pass    
+
+    def loadData(self):
+        import json, io
+        from fifitools import Obs
+        print 'loading previous reduced data'
+        with open('fifimon.json') as f:
+            data = json.load(f)
+        for key,value in data.iteritems():
+            spec=np.array(value['spec'])
+            x=value['x']
+            y=value['y']
+            ra=value['ra']
+            dec=value['dec']
+            angle=value['angle']
+            alt=value['alt']
+            za=value['za']
+            wv=value['wv']
+            nod=value['nod']
+            fgid=value['fgid']
+            n=value['n']
+            gp=np.array(value['gp'])
+            self.fileNames.append(key)
+            self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
         
     def fileQuit(self):
+        self.saveData()    
         self.close()
 
     def closeEvent(self, ce):
