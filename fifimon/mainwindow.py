@@ -352,6 +352,7 @@ class FluxCanvas(MplCanvas):
 
     def updateFigure(self,nod,fn,spec,infile,za,alti,wv):
         # get number of grating positions
+        print "shape spec is: ",np.shape(spec)
         ng = (np.shape(spec))[1]
         self.coverage = 16+0.5*ng
         sp16 = np.arange(16)
@@ -466,7 +467,7 @@ class myListWidget(QListWidget):
         mw.sb.showMessage("You selected the FileGroupID: "+item.text(),2000)
         mw.lf.setVisible(False)
         # Trigger event related to item list ....
-        mw.addObs(item.text())
+        mw.addObs(item.text(),False)
 
 
 # We should probably add a threaded class to add observations.
@@ -631,6 +632,7 @@ class ApplicationWindow(QMainWindow):
         self.sb.showMessage("Welcome to FIFI Monitor!", 10000)
 
         # Periodical update
+        #self.reduction=False
         timer = QTimer(self)
         timer.timeout.connect(self.update_fifimon)
         timer.start(3000)
@@ -670,7 +672,16 @@ class ApplicationWindow(QMainWindow):
         print 'loading previous reduced data'
         with open('fifimon.json') as f:
             data = json.load(f)
-        for key,value in data.iteritems():
+        # I have to find a way to read in a sorted way
+        # data.iteritems seems to treat this as a
+
+        key = []
+        for k,v in data.iteritems():
+            key.append(k)
+        key.sort()
+            
+        for k in key:
+            value = data[k]
             spec=np.array(value['spec'])
             x=value['x']
             y=value['y']
@@ -684,8 +695,10 @@ class ApplicationWindow(QMainWindow):
             fgid=value['fgid']
             n=value['n']
             gp=np.array(value['gp'])
-            self.fileNames.append(key)
+            self.fileNames.append(k)
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
+
+        print "Added ", len(key)," objects"
         
     def fileQuit(self):
         self.saveData()    
@@ -701,10 +714,10 @@ class ApplicationWindow(QMainWindow):
         message=file.read()
         QMessageBox.about(self, "About", message)
 
-    def addObs(self, fileGroupId = None):
+    def addObs(self, fileGroupId = None, newfiles=False):
         from fifitools import readData, multiSlopes, Obs
         import os
-        import psutil
+        #import psutil
         firstRun = 0
         if fileGroupId != None:
             self.fileGroupId = fileGroupId
@@ -733,24 +746,37 @@ class ApplicationWindow(QMainWindow):
 
             
         for infile in selFileNames:
+            #print "infile", infile    
             if infile not in self.fileNames:
                 print "Reading file: ", infile
-                self.fileNames.append(infile)
-                aor, hk, gratpos, flux = readData(infile+".fits")
-                spectra = multiSlopes(flux)
-                QApplication.processEvents()
-                spectrum = np.nanmedian(spectra,axis=2)
-                detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
-                obsdate, coords, offset, angle, za, altitude, wv = hk
-                self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
-                # Give time to the system to update the GUI
-                QApplication.processEvents()
-            self.update_figures(infile)
+                try:
+                    self.fileNames.append(infile)
+                    aor, hk, gratpos, flux = readData(infile+".fits")
+                    print "flux shape is: ",np.shape(flux)
+                    spectra = multiSlopes(flux)
+                    #print "shape of spectrum ", np.shape(spectra)
+                    spectrum = np.nanmedian(spectra,axis=2)
+                    detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
+                    obsdate, coords, offset, angle, za, altitude, wv = hk
+                    #print "shape of spectrum ", np.shape(spectrum)
+                    self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
+                    # Give time to the system to update the GUI
+                    QApplication.processEvents()
+                    self.update_figures(infile)
+                except:
+                    print "Problems with file: ", infile
+                    #newfiles=True
+            else:
+                if not newfiles:
+                    #print "call update figure"
+                    self.update_figures(infile)
             # Used memory check
             #pid = os.getpid()
             #py = psutil.Process(pid)
             #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
             #print('memory use:', memoryUse)
+        # When exiting reset reduction
+        #self.reduction = False
 
     def update_figures(self,infile):
         # Create lists of spectra, nod, positions, and file numbers
@@ -767,6 +793,13 @@ class ApplicationWindow(QMainWindow):
         This module is called automatically every n seconds (n=10, typically) to look
         for new files in the directory, update the lists and, eventually, the plot
         '''
+
+        # Check if running reductions
+#        if self.reduction == False:
+#            self.reduction == True
+#        else:
+#            return
+
         from fifitools import exploreDirectory
         cwd = os.getcwd()
         files, start, fgid = exploreDirectory(cwd+"/")
@@ -781,11 +814,13 @@ class ApplicationWindow(QMainWindow):
 
         for f,fg in zip(files,fgid):
             if f not in self.files:
-                #print "updating file list ..."
+                print "updating file list ..."
                 self.files = np.append(self.files,f)
                 self.fgid = np.append(self.fgid, fg)
                 # update plot (if same fileGroupID)
-                self.addObs()
+                # Check this part. It works if reading from fifimon.json and adding new files in the directory.
+                # But does not work if Timer finds new files in the directory ... and restart replotting all the list of files slowing everything down
+                self.addObs(None,True)
             if fg not in self.fgidList:
                 # update fileGroupID list    
                 self.fgidList.append(fg)
@@ -801,7 +836,7 @@ class ApplicationWindow(QMainWindow):
                     # Eventually hide list
                     self.lf.setVisible(False)
                     # Start new plot
-                    self.addObs(fg)
+                    self.addObs(fg,False)
                 else:
                     pass    
 
