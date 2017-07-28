@@ -366,6 +366,7 @@ class FluxCanvas(MplCanvas):
             c = 'red'
 
         s = spec[i]
+        print "ng is: ",ng
         for j in np.arange(ng):
             self.axes2.plot(sp16+i*self.coverage+j*0.5, s[j,:], color=colors[i])
 
@@ -697,6 +698,7 @@ class ApplicationWindow(QMainWindow):
             gp=np.array(value['gp'])
             self.fileNames.append(k)
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
+            print k, np.shape(spec)
 
         print "Added ", len(key)," objects"
         
@@ -783,7 +785,8 @@ class ApplicationWindow(QMainWindow):
         fn,nod,ra,dec,x,y,angle,spectra,za,alti,wv = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv)
                                                                      for o in self.obs if o.fgid == self.fileGroupId)))
         # Display the data
-        #print "Adding to the plot ",infile
+        print "Adding to the plot ",infile
+        print np.shape(spectra)
         self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
         self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
                 
