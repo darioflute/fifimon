@@ -668,21 +668,17 @@ class ApplicationWindow(QMainWindow):
         pass    
 
     def loadData(self):
-        import json, io
+        import json
+        from collections import OrderedDict
         from fifitools import Obs
         print 'loading previous reduced data'
+        # Read the json file as ordered dictionary to preserve the
+        # order the objects were saved
         with open('fifimon.json') as f:
-            data = json.load(f)
-        # I have to find a way to read in a sorted way
-        # data.iteritems seems to treat this as a
+            data = json.load(f, object_pairs_hook=OrderedDict)
 
-        key = []
-        for k,v in data.iteritems():
-            key.append(k)
-        key.sort()
-            
-        for k in key:
-            value = data[k]
+        for key,value in data.iteritems():
+            self.fileNames.append(key)
             spec=np.array(value['spec'])
             x=value['x']
             y=value['y']
@@ -696,11 +692,19 @@ class ApplicationWindow(QMainWindow):
             fgid=value['fgid']
             n=value['n']
             gp=np.array(value['gp'])
-            self.fileNames.append(k)
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
-            print k, np.shape(spec)
+            
 
-        print "Added ", len(key)," objects"
+        # key = []
+        # for k,v in data.iteritems():
+        #     key.append(k)
+        # key.sort()
+            
+        # for k in key:
+        #     value = data[k]
+        #     print k, np.shape(spec)
+
+        #print "Added ", len(key)," objects"
         
     def fileQuit(self):
         self.saveData()    
