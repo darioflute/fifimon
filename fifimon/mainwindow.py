@@ -332,7 +332,7 @@ class FluxCanvas(MplCanvas):
         self.axes1.set_ylim([25,75])
         self.axes1.set_ylabel('Zenith angle [degs]')
         self.axes1b = self.axes1.twinx()
-        self.axes1b.set_ylim([35000,46000])
+        self.axes1b.set_ylim([36000,45000])
         self.axes1b.get_yaxis().set_tick_params(labelright='on',right='on')            
         self.axes1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
         self.axes1b.yaxis.set_label_coords(-0.13,0.5)
@@ -744,12 +744,16 @@ class ApplicationWindow(QMainWindow):
         if firstRun:
             #print "This is the first run "
             # Grab RA-Dec of first file and restart the WCS
-            aor, hk, gratpos, flux = readData(selFileNames[0]+".fits")
-            obsdate, coords, offset, angle, za, altitude, wv = hk
-            self.pc.compute_initial_figure(coords[0],coords[1])
-            # Clear the plot
-            self.fc.compute_initial_figure(self.fileGroupId)
-
+            try:
+                aor, hk, gratpos, flux = readData(selFileNames[0]+".fits")
+                obsdate, coords, offset, angle, za, altitude, wv = hk
+                self.pc.compute_initial_figure(coords[0],coords[1])
+                # Clear the plot
+                self.fc.compute_initial_figure(self.fileGroupId)
+            except:
+                # Clear the plot
+                self.fc.compute_initial_figure(self.fileGroupId)
+                print "Failed to read file ",selFileNames[0]+".fits"
             
         for infile in selFileNames:
             #print "infile", infile    
