@@ -352,7 +352,7 @@ class FluxCanvas(MplCanvas):
 
     def updateFigure(self,nod,fn,spec,infile,za,alti,wv):
         # get number of grating positions
-        print "shape spec is: ",np.shape(spec)
+        #print "shape spec is: ",np.shape(spec)
         ng = (np.shape(spec))[1]
         self.coverage = 16+0.5*ng
         sp16 = np.arange(16)
@@ -366,7 +366,7 @@ class FluxCanvas(MplCanvas):
             c = 'red'
 
         s = spec[i]
-        print "ng is: ",ng
+        #print "ng is: ",ng
         for j in np.arange(ng):
             self.axes2.plot(sp16+i*self.coverage+j*0.5, s[j,:], color=colors[i])
 
@@ -743,17 +743,16 @@ class ApplicationWindow(QMainWindow):
 
         if firstRun:
             #print "This is the first run "
-            # Grab RA-Dec of first file and restart the WCS
             try:
                 aor, hk, gratpos, flux = readData(selFileNames[0]+".fits")
                 obsdate, coords, offset, angle, za, altitude, wv = hk
-                self.pc.compute_initial_figure(coords[0],coords[1])
-                # Clear the plot
-                self.fc.compute_initial_figure(self.fileGroupId)
             except:
-                # Clear the plot
-                self.fc.compute_initial_figure(self.fileGroupId)
-                print "Failed to read file ",selFileNames[0]+".fits"
+                print "Failed to read file ",selFileNames[0]
+            # Clear the plot
+            # Grab RA-Dec of first file and restart the WCS
+            self.pc.compute_initial_figure(coords[0],coords[1])
+            self.fc.compute_initial_figure(self.fileGroupId)
+
             
         for infile in selFileNames:
             #print "infile", infile    
