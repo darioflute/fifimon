@@ -513,9 +513,10 @@ class ApplicationWindow(QMainWindow):
         # Colors from https://designschool.canva.com/blog/website-color-schemes/
         # To work on MAC-OSX for QToolBar, one has to set the border to force the style on the system
         # https://bugreports.qt.io/browse/QTBUG-12717
+        # Qt documentation: http://doc.qt.io/qt-5/stylesheet-examples.html
         self.setStyleSheet("""
         QMainWindow {
-        background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #FFF6BA, stop: 1 #F2D388);
+        background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 LemonChiffon, stop: 1 #F2D388);
         }
         QMenu {
         background-color: #D8AB4E;
@@ -619,7 +620,7 @@ class ApplicationWindow(QMainWindow):
         self.mpl_toolbar2.setObjectName('tb2')
 
         # Actions
-        exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exiting', self)
+        exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exit the program', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(self.closeEvent)
         exitAction.setMenuRole(QAction.NoRole)
