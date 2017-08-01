@@ -6,8 +6,8 @@
 
 
 # Reading the data, processing, displaying them
-import matplotlib
-import matplotlib.pyplot as plt
+#import matplotlib
+#import matplotlib.pyplot as plt
 from matplotlib import rcParams
 rcParams['font.family']='STIXGeneral'
 rcParams['font.size']=13
@@ -22,10 +22,10 @@ from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-from PyQt5.QtWidgets import (QWidget, QMainWindow, QPushButton, QMessageBox,QToolBar,QAction,QStatusBar,
-                             QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu,QMenuBar)
+from PyQt5.QtWidgets import (QWidget, QMainWindow, QMessageBox,QToolBar,QAction,QStatusBar,
+                             QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu)
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QThread, QTimer
+from PyQt5.QtCore import Qt, QTimer
 
 
 import os, sys
@@ -115,7 +115,7 @@ class PositionCanvas(MplCanvas):
 
         
     def updateFigure(self, nod, fn, ra, dec, dx, dy, angle, infile):
-        n = len(nod)
+        #n = len(nod)
         # Find index of infile
         i = fn.index(int(infile[:5]))
         
@@ -156,7 +156,7 @@ class PositionCanvas(MplCanvas):
         dx = side*0.5*(np.cos(theta)-np.sin(theta))
         dy = side*0.5*(np.sin(theta)+np.cos(theta))
         rect = Rectangle((x[i] - dx, y[i] - dy), side,side,angle=-angle[i],fc='none',ec=colors[i])
-        patch = self.axes.add_patch(rect)
+        self.axes.add_patch(rect)
         # Add patch on current position
         try:
             self.greenpatch.remove()
@@ -360,10 +360,10 @@ class FluxCanvas(MplCanvas):
         #print fn
         i = fn.index(int(infile[:5]))
         colors = ['blue' if a =='A' else 'red' for a in nod]
-        if nod[i] == 'A':
-            c = 'blue'
-        else:
-            c = 'red'
+        #if nod[i] == 'A':
+        #    c = 'blue'
+        #else:
+        #    c = 'red'
 
         s = spec[i]
         #print "ng is: ",ng
@@ -429,14 +429,14 @@ class FluxCanvas(MplCanvas):
         # get number of grating positions
         ng = (np.shape(spec))[1]
         self.coverage = 16*ng
-        sp16 = np.arange(16)
-        n = len(nod)
+        #sp16 = np.arange(16)
+        #n = len(nod)
         i = fn.index(int(infile[:5]))
         colors = ['blue' if a =='A' else 'red' for a in nod]
-        if nod[i] == 'A':
-            c = 'blue'
-        else:
-            c = 'red'
+        #if nod[i] == 'A':
+        #    c = 'blue'
+        #else:
+        #    c = 'red'
 
         s = spec[i]
         x = []
@@ -566,7 +566,7 @@ class ApplicationWindow(QMainWindow):
 
         # Menu
         self.file_menu = self.menuBar().addMenu('&File')
-        self.quit_program = QAction('Quit',self,shortcut='Ctrl+Q',triggered=self.fileQuit)
+        self.quit_program = QAction('Quit',self,shortcut='Ctrl+q',triggered=self.fileQuit)
         self.file_menu.addAction(self.quit_program)
         
         self.file_menu = self.menuBar().addMenu('&Help')
@@ -874,7 +874,7 @@ class ApplicationWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     screen_resolution = app.desktop().screenGeometry()
-    width, height = screen_resolution.width(), screen_resolution.height()
+    width = screen_resolution.width()
     aw = ApplicationWindow()
     aw.setGeometry(100, 100, width*0.9, width*0.35)
     progname = 'FIFI Monitor'
