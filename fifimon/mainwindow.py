@@ -513,20 +513,32 @@ class ApplicationWindow(QMainWindow):
         # Colors from https://designschool.canva.com/blog/website-color-schemes/
         self.setStyleSheet("""
         QMainWindow {
-        background-color: #FFF6BA;
+        background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #FFF6BA, stop: 1 #F2D388);
         }
         QMenu {
         background-color: #D8AB4E;
+        background: '#FFF6BA';
         color: 'black';
         }
         QMenuBar {
         background-color: #F2D388;
+        background: #F2D388;
+        color: 'black';
         }
         QStatusBar {
-        background-color: #F2D388;
+        background-color: #FFF6BA;
         }
         QToolBar#tb1 {
         background-color: #FFF6BA;
+        }
+        QToolBar#tb2 {
+        background-color: #FFF6BA;
+        }
+        QToolBar#tb {
+        background-color: #FFF6BA;
+        }
+        QIcon {
+        background: 'transparent';
         }
         """)
         
@@ -587,6 +599,7 @@ class ApplicationWindow(QMainWindow):
         self.mpl_toolbar.setObjectName('tb1')
         self.mpl_toolbar2 = NavigationToolbar(self.fc, self)
         self.mpl_toolbar2.pan('on')
+        self.mpl_toolbar2.setObjectName('tb2')
 
         # Actions
         exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exiting', self)
@@ -602,7 +615,8 @@ class ApplicationWindow(QMainWindow):
         self.tb.setMovable(True)
         self.tb.addAction(hideAction)
         self.tb.addAction(exitAction)
-
+        self.tb.setObjectName('tb')
+        
         # Widget list
         self.lf = myListWidget()
         for item in self.fgidList:
