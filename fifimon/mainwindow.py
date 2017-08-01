@@ -23,7 +23,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from PyQt5.QtWidgets import (QWidget, QMainWindow, QPushButton, QMessageBox,QToolBar,QAction,QStatusBar,
-                             QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu)
+                             QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu,QMenuBar)
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QThread, QTimer
 
@@ -547,18 +547,34 @@ class ApplicationWindow(QMainWindow):
             self.loadData()
         except:
             pass
-        # Menu
-        self.file_menu = QtWidgets.QMenu('&File', self)
-        self.file_menu.addAction('&Quit', self.fileQuit, Qt.CTRL + Qt.Key_Q)
-        menubar = self.menuBar()
-        # Request for the MacOSX - do not use native menubar
-        menubar.setNativeMenuBar(False)
-        menubar.addMenu(self.file_menu)
 
-        self.help_menu = QtWidgets.QMenu('&Help', self)
-        menubar.addSeparator()
-        menubar.addMenu(self.help_menu)
-        self.help_menu.addAction('&About', self.about)
+        # Menu
+        # self.file_menu = QMenu('&File', self)
+        # self.file_menu.addAction('&Quit', self.fileQuit, Qt.CTRL + Qt.Key_Q)
+
+        # self.help_menu = QMenu('&Help', self)
+        # self.help_menu.addAction('&About', self.about)
+
+        # #menubar = self.menuBar()
+        # menubar = QMenuBar()
+        # self.setMenuBar(menubar)
+        # # Request for the MacOSX - do not use native menubar
+        # #menubar.setNativeMenuBar(False)
+        # menubar.addMenu(self.file_menu)
+        # menubar.addSeparator()
+        # menubar.addMenu(self.help_menu)
+
+        # Menu
+        self.file_menu = self.menuBar().addMenu('&File')
+        self.quit_program = QAction('Quit',self,shortcut='Ctrl+Q',triggered=self.fileQuit)
+        self.file_menu.addAction(self.quit_program)
+        
+        self.file_menu = self.menuBar().addMenu('&Help')
+        self.about_code = QAction('About',self,shortcut='Ctrl+h',triggered=self.about)
+        self.file_menu.addAction(self.about_code)
+
+        self.menuBar().setNativeMenuBar(False)
+
 
         # Define main widget
         self.main_widget = QWidget(self)
@@ -573,9 +589,10 @@ class ApplicationWindow(QMainWindow):
         self.mpl_toolbar2.pan('on')
 
         # Actions
-        exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exit', self)
+        exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exiting', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(self.closeEvent)
+        exitAction.setMenuRole(QAction.NoRole)
         hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
