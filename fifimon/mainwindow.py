@@ -532,7 +532,7 @@ class ApplicationWindow(QMainWindow):
         background: transparent;
         spacing: 3px;
         padding: 1px 4px;
-        border-radiux: 4px;
+        border-radius: 4px;
         }
         QMenuBar::item:selected { /* when selected using mouse or keyboard */
         background: #FFF6BA;
