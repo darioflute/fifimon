@@ -6,8 +6,6 @@
 
 
 # Reading the data, processing, displaying them
-#import matplotlib
-#import matplotlib.pyplot as plt
 from matplotlib import rcParams
 rcParams['font.family']='STIXGeneral'
 rcParams['font.size']=13
@@ -17,7 +15,8 @@ from matplotlib.patches import Rectangle
 from matplotlib import collections  as mc
 
 # Make sure that we are using QT5
-#matplotlib.use('Qt5Agg')
+import matplotlib
+matplotlib.use('Qt5Agg')
 from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -37,14 +36,12 @@ import warnings
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
 
-#from multiprocessing import Process
 
 class MplCanvas(FigureCanvas):
     """Ultimately, this is a QWidget (as well as a FigureCanvasAgg, etc.)."""
 
     def __init__(self, parent=None, width=5, height=4, dpi=100):
         self.fig = Figure(figsize=(width, height), dpi=dpi)
-#        self.axes = self.fig.add_axes([0.1, 0.1, 0.8, 0.8])
 
         FigureCanvas.__init__(self, self.fig)
         self.setParent(parent)
@@ -92,8 +89,6 @@ class PositionCanvas(MplCanvas):
         self.w.wcs.cdelt = np.array([1,1])
         self.w.wcs.pc[0]=[1,0]
         self.w.wcs.pc[1]=[-0,1]
-        #self.w.wcs.naxis1=1000
-        #self.w.wcs.naxis2=1000
         self.w.wcs.cunit=['deg','deg']
         if ra == None:
             ra = 0
@@ -104,8 +99,6 @@ class PositionCanvas(MplCanvas):
         self.offsets = []
         self.filename = []
         self.w.wcs.crval=[ra,dec]
-        #        self.axes = self.fig.add_subplot(111, projection=self.w)
-        #        #        self.axes.set_xlim([0,20*20]) # Set at least 20 observations
 
         self.axes = self.fig.add_subplot(111, projection=self.w)
         self.t = self.axes.get_transform(self.w)
@@ -115,7 +108,6 @@ class PositionCanvas(MplCanvas):
 
         
     def updateFigure(self, nod, fn, ra, dec, dx, dy, angle, infile):
-        #n = len(nod)
         # Find index of infile
         i = fn.index(int(infile[:5]))
         
@@ -129,27 +121,6 @@ class PositionCanvas(MplCanvas):
         self.offsets.append((dx[i],dy[i]))
         self.filename.append(infile)
         
-        #self.axes.scatter(x,y,facecolors='none',edgecolors='none',marker=(4,0,angle[0]),s=0,transform=self.t)
-        #self.axes.clear()
-        # Get new limits
-        #x0,y0 = self.axes.transAxes.transform(([0,0]))
-        #x1,y1 = self.axes.transAxes.transform(([1,1]))
-        #xl0,xl1 = self.axes.get_xlim()
-        #yl0,yl1 = self.axes.get_ylim()
-        #bbox = self.axes.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
-        #width, height = bbox.width, bbox.height
-        # The size of the marker is the side of a square circumscribing the rotated square
-        #radiant = np.pi/180.
-        #theta = (angle[0]+45.)*radiant
-        #fact = np.sin(theta)+np.cos(theta)
-        #deltay = (yl1-yl0)*3600.
-        ## Adjust marker size 1 arcmin for red, 30 arcsec for blue
-        ## size should be in points^2, a points is 1/72 of an inch
-        #size = (30./deltay * height*72 *self.axes.get_data_ratio()*fact)**2
-        #self.arrays = self.axes.scatter(x,y,facecolors='none',edgecolors=colors,marker=(4,0,45+angle[0]),s=size,transform=self.t)
-        ##        if i == (len(fn)-1):
-        ##            self.axes.scatter(x[i],y[i],facecolors=colors[i],edgecolors=colors[i],marker=(4,0,45+angle[0]),s=size,transform=self.t)
-            
         # Add rectangle patch
         side = 30./3600.
         theta = -angle[i]*np.pi/180.
@@ -181,9 +152,6 @@ class FluxCanvas(MplCanvas):
 
     def __init__(self, *args, **kwargs):
         MplCanvas.__init__(self, *args, **kwargs)
-        #    timer = QTimer(self)
-        #    timer.timeout.connect(self.update_figure)
-        #    timer.start(3000)
         # Mouse wheel zooming
         self.cidPress = self.fig.canvas.mpl_connect('scroll_event', self.onWheel)
         #self.picPress = self.fig.canvas.mpl_connect('pick_event', self.onPick)
@@ -306,13 +274,6 @@ class FluxCanvas(MplCanvas):
 
     def onRelease(self, event):
         if self.dragged is not None:
-            #deltax = event.xdata - self.pick_pos[0]
-            #deltay = event.ydata - self.pick_pos[1]
-            #print "delta ", deltax,deltay
-            #curr_xlim = self.axes.get_xlim()
-            #curr_ylim = self.axes.get_ylim()
-            #self.axes.set_xlim(curr_xlim-deltax)
-            #self.axes.set_ylim(curr_ylim-deltay)
             self.dragged = None
             self.draw()
         return True
@@ -360,13 +321,7 @@ class FluxCanvas(MplCanvas):
         #print fn
         i = fn.index(int(infile[:5]))
         colors = ['blue' if a =='A' else 'red' for a in nod]
-        #if nod[i] == 'A':
-        #    c = 'blue'
-        #else:
-        #    c = 'red'
-
         s = spec[i]
-        #print "ng is: ",ng
         for j in np.arange(ng):
             self.axes2.plot(sp16+i*self.coverage+j*0.5, s[j,:], color=colors[i])
 
@@ -429,14 +384,8 @@ class FluxCanvas(MplCanvas):
         # get number of grating positions
         ng = (np.shape(spec))[1]
         self.coverage = 16*ng
-        #sp16 = np.arange(16)
-        #n = len(nod)
         i = fn.index(int(infile[:5]))
         colors = ['blue' if a =='A' else 'red' for a in nod]
-        #if nod[i] == 'A':
-        #    c = 'blue'
-        #else:
-        #    c = 'red'
 
         s = spec[i]
         x = []
@@ -579,22 +528,6 @@ class ApplicationWindow(QMainWindow):
             pass
 
         # Menu
-        # self.file_menu = QMenu('&File', self)
-        # self.file_menu.addAction('&Quit', self.fileQuit, Qt.CTRL + Qt.Key_Q)
-
-        # self.help_menu = QMenu('&Help', self)
-        # self.help_menu.addAction('&About', self.about)
-
-        # #menubar = self.menuBar()
-        # menubar = QMenuBar()
-        # self.setMenuBar(menubar)
-        # # Request for the MacOSX - do not use native menubar
-        # #menubar.setNativeMenuBar(False)
-        # menubar.addMenu(self.file_menu)
-        # menubar.addSeparator()
-        # menubar.addMenu(self.help_menu)
-
-        # Menu
         self.file_menu = self.menuBar().addMenu('&File')
         self.quit_program = QAction('Quit',self,shortcut='Ctrl+q',triggered=self.fileQuit)
         self.file_menu.addAction(self.quit_program)
@@ -662,10 +595,8 @@ class ApplicationWindow(QMainWindow):
         radecLayout.addWidget(self.sb)
         fluxLayout.addWidget(self.fc)
 
-        #fluxLayout.addWidget(self.mpl_toolbar2)
         toolLayout.addWidget(self.mpl_toolbar2)
         toolLayout.addWidget(self.tb)
-        #radecLayout.addWidget(self.tb)
         fluxLayout.addWidget(toolWidget)
 
         splitter1.addWidget(radecWidget)
@@ -744,16 +675,6 @@ class ApplicationWindow(QMainWindow):
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
             
 
-        # key = []
-        # for k,v in data.iteritems():
-        #     key.append(k)
-        # key.sort()
-            
-        # for k in key:
-        #     value = data[k]
-        #     print k, np.shape(spec)
-
-        #print "Added ", len(key)," objects"
         
     def fileQuit(self):
         self.saveData()    
