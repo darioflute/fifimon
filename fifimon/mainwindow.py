@@ -511,6 +511,8 @@ class ApplicationWindow(QMainWindow):
 
         # Background color (FFF7C0 is buttermilk, DCAE1D is honey, F2D388 is butter)
         # Colors from https://designschool.canva.com/blog/website-color-schemes/
+        # To work on MAC-OSX for QToolBar, one has to set the border to force the style on the system
+        # https://bugreports.qt.io/browse/QTBUG-12717
         self.setStyleSheet("""
         QMainWindow {
         background-color: QLinearGradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #FFF6BA, stop: 1 #F2D388);
@@ -521,21 +523,36 @@ class ApplicationWindow(QMainWindow):
         color: 'black';
         }
         QMenuBar {
-        background-color: #F2D388;
+        background-color: QLinearGradient(x1:0, y1:0, x2:0, y2:1, stop:0 #FFF6BA, stop:1 #F2D388);
         background: #F2D388;
         color: 'black';
+        }
+        QMenuBar::item {
+        background: transparent;
+        spacing: 3px;
+        padding: 1px 4px;
+        border-radiux: 4px;
+        }
+        QMenuBar::item:selected { /* when selected using mouse or keyboard */
+        background: #FFF6BA;
+        }
+        QMenuBar::item:pressed {
+        background: #DCAE1D;
         }
         QStatusBar {
         background-color: #FFF6BA;
         }
         QToolBar#tb1 {
         background-color: #FFF6BA;
+        border: 1px #FFF6BA;
         }
         QToolBar#tb2 {
         background-color: #FFF6BA;
+        border: 1px #FFF6BA;
         }
         QToolBar#tb {
         background-color: #FFF6BA;
+        border: 1px #FFF6BA;
         }
         QIcon {
         background: 'transparent';
