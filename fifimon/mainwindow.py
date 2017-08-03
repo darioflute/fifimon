@@ -506,6 +506,9 @@ class ApplicationWindow(QMainWindow):
         background-color: transparent;
         border: 1px transparent;
         }
+        QToolBar::separator{
+        color: transparent;
+        }
         QToolButton:pressed {
         background-color: LemonChiffon;
         border-radius: 3px;
