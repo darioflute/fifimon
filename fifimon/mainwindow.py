@@ -24,7 +24,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from PyQt5.QtWidgets import (QWidget, QMainWindow, QMessageBox,QToolBar,QAction,QStatusBar,
                              QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu)
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QObject
 
 
 import os, sys
@@ -440,6 +440,56 @@ class myListWidget(QListWidget):
 #             self.sec_signal.emit(str(self.current_time))
 #             self.current_time += 1
     
+class UpdateObjects(QObject):
+    from fifitools import Obs
+    updateObjects = pyqtSignal(Obs)
+
+
+class WorkerThread(QThread):
+
+    #updateObjects = pyqtSignal('QObject')
+    updateObjects = UpdateObjects()
+    updateFigures = pyqtSignal('QString')
+
+    def __init__(self, selFileNames, fileNames, obs, parent=None):
+        super(WorkerThread, self).__init__(parent)
+        self.selFileNames = selFileNames
+        self.fileNames = fileNames
+        self.obs = obs
+        
+    def run(self):
+        from fifitools import readData, multiSlopes, Obs
+        for infile in self.selFileNames:
+            #print "infile", infile    
+            if infile not in self.fileNames:
+                print "Reading file: ", infile
+                try:
+                    self.fileNames.append(infile)
+                    aor, hk, gratpos, flux = readData(infile+".fits")
+                    #print "flux shape is: ",np.shape(flux)
+                    spectra = multiSlopes(flux)
+                    #print "shape of spectrum ", np.shape(spectra)
+                    spectrum = np.nanmedian(spectra,axis=2)
+                    detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
+                    obsdate, coords, offset, angle, za, altitude, wv = hk
+                    print "shape of spectrum ", np.shape(spectrum)
+                    obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos)
+                    # Call this with a signal from thread
+                    #self.update_figures(infile)
+                    #self.emit(SIGNAL('updateObjects(Obj)'),obj)
+                    #self.emit(SIGNAL('updateFigures(QString)'),infile)
+                    self.updateObjects.updateObjects.emit(obj)
+                    self.updateFigures.emit(infile)                    
+                except:
+                    print "Problems with file: ", infile
+                    #newfiles=True
+            else:
+                #if not newfiles:
+                    #print "call update figure"
+                    #self.emit(SIGNAL('updateFigures(QString)'),infile)
+                self.updateFigures.emit(infile)
+        print "Done with thread"
+
 
 
 class ApplicationWindow(QMainWindow):
@@ -692,6 +742,7 @@ class ApplicationWindow(QMainWindow):
 
     def addObs(self, fileGroupId = None, newfiles=False):
         from fifitools import readData, multiSlopes, Obs
+        from astropy.io import fits
         import os
         #import psutil
         firstRun = 0
@@ -712,43 +763,54 @@ class ApplicationWindow(QMainWindow):
         # Check if file names already appear in previous list, otherwise append them and read/process/display relative data
 
         if firstRun:
-            #print "This is the first run "
             try:
-                aor, hk, gratpos, flux = readData(selFileNames[0]+".fits")
-                obsdate, coords, offset, angle, za, altitude, wv = hk
+                # Grab RA-Dec of first file and restart the WCS
+                hdulist = fits.open(selFileNames[0]+".fits")
+                header = hdulist[0].header
+                ra   = float(header['OBSLAM'])
+                dec  = float(header['OBSBET'])
+                hdulist.close()
+                self.pc.compute_initial_figure(ra,dec)
+                self.fc.compute_initial_figure(self.fileGroupId)
             except:
                 print "Failed to read file ",selFileNames[0]
-            # Clear the plot
-            # Grab RA-Dec of first file and restart the WCS
-            self.pc.compute_initial_figure(coords[0],coords[1])
-            self.fc.compute_initial_figure(self.fileGroupId)
 
-            
-        for infile in selFileNames:
-            #print "infile", infile    
-            if infile not in self.fileNames:
-                print "Reading file: ", infile
-                try:
-                    self.fileNames.append(infile)
-                    aor, hk, gratpos, flux = readData(infile+".fits")
-                    print "flux shape is: ",np.shape(flux)
-                    spectra = multiSlopes(flux)
-                    #print "shape of spectrum ", np.shape(spectra)
-                    spectrum = np.nanmedian(spectra,axis=2)
-                    detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
-                    obsdate, coords, offset, angle, za, altitude, wv = hk
-                    #print "shape of spectrum ", np.shape(spectrum)
-                    self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
-                    # Give time to the system to update the GUI
-                    QApplication.processEvents()
-                    self.update_figures(infile)
-                except:
-                    print "Problems with file: ", infile
-                    #newfiles=True
-            else:
-                if not newfiles:
-                    #print "call update figure"
-                    self.update_figures(infile)
+        # Put this in a thread ?
+        self.workerThread = WorkerThread(selFileNames,self.fileNames,self.obs)
+        #self.connect(self.workerThread, SIGNAL('updateFigures(QString)'),self.update_figures,Qt.DirectConnection)
+        #self.connect(self.workerThread, SIGNAL('updateFigures(Obj)'),self.update_objects,Qt.DirectConnection)
+        # New style for PyQt5
+        self.workerThread.updateObjects.updateObjects.connect(self.update_objects)
+        self.workerThread.updateFigures.connect(self.update_figures)
+
+        self.workerThread.start()
+        
+        # for infile in selFileNames:
+        #     #print "infile", infile    
+        #     if infile not in self.fileNames:
+        #         print "Reading file: ", infile
+        #         try:
+        #             self.fileNames.append(infile)
+        #             aor, hk, gratpos, flux = readData(infile+".fits")
+        #             print "flux shape is: ",np.shape(flux)
+        #             spectra = multiSlopes(flux)
+        #             #print "shape of spectrum ", np.shape(spectra)
+        #             spectrum = np.nanmedian(spectra,axis=2)
+        #             detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
+        #             obsdate, coords, offset, angle, za, altitude, wv = hk
+        #             #print "shape of spectrum ", np.shape(spectrum)
+        #             self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
+        #             # Give time to the system to update the GUI
+        #             QApplication.processEvents()
+        #             # Call this with a signal from thread
+        #             self.update_figures(infile)
+        #         except:
+        #             print "Problems with file: ", infile
+        #             #newfiles=True
+        #     else:
+        #         if not newfiles:
+        #             #print "call update figure"
+        #             self.update_figures(infile)
             # Used memory check
             #pid = os.getpid()
             #py = psutil.Process(pid)
@@ -757,16 +819,21 @@ class ApplicationWindow(QMainWindow):
         # When exiting reset reduction
         #self.reduction = False
 
+    def update_objects(self, obj):
+        print "Obs updated"
+        self.obs.append(obj)
+
+                              
     def update_figures(self,infile):
         # Create lists of spectra, nod, positions, and file numbers
         fn,nod,ra,dec,x,y,angle,spectra,za,alti,wv = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv)
                                                                      for o in self.obs if o.fgid == self.fileGroupId)))
         # Display the data
         print "Adding to the plot ",infile
-        print np.shape(spectra)
+        #print np.shape(spectra)
         self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
         self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
-                
+              
     
     def update_fifimon(self):
         '''

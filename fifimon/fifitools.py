@@ -98,7 +98,6 @@ def readData(fitsfile):
         data *= 3.63/65536.            # ADU to V
         nramps = np.size(data[:,0,0])
         if nramps < (ncycles*4*ngrat*32):
-            flux = 0
             print "WARNING: Number of ramps does not agree with header for ",fitsfile
         else:
             data = data[:ncycles*4*ngrat*32,1:17,:25]
@@ -106,7 +105,7 @@ def readData(fitsfile):
             gratpos = start+step*np.arange(ngrat)
             aor = (detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum)
             hk  = (obsdate, (ra,dec), (dx,dy), angle, (za_sta,za_end), (alti_sta,alti_end), (wv_sta,wv_end))
-        return aor, hk, gratpos, flux
+            return aor, hk, gratpos, flux
 
 
             
@@ -183,7 +182,7 @@ def multiSlopes(data):
 
     ng = ds[0]
     ncpu = mp.cpu_count()
-#    print "ncpu ", ncpu
+    #print "ncpu ", ncpu
     pool = mp.Pool(processes=ncpu)
     res = [pool.apply_async(computeSlope, args=(i,data[:,:,:,i])) for i in range(25)]
     results = [p.get() for p in res]
