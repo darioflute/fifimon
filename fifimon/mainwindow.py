@@ -12,7 +12,7 @@ rcParams['font.size']=13
 rcParams['mathtext.fontset']='stix'
 rcParams['legend.numpoints']=1
 from matplotlib.patches import Rectangle
-from matplotlib import collections  as mc
+from matplotlib.collections import LineCollection
 
 # Make sure that we are using QT5
 import matplotlib
@@ -287,6 +287,12 @@ class FluxCanvas(MplCanvas):
         self.displayZA = True
         self.displayAlt = True
         self.displayWV = True
+
+        # Initialize variables
+        self.zalines = []
+        self.altlines =[]
+        self.wvlines = []
+        self.cza = []
         # Create box
         self.axes1 = self.fig.add_subplot(211)
         self.axes1.set_xlim([0,20*20]) # Set at least 20 observations
@@ -325,19 +331,10 @@ class FluxCanvas(MplCanvas):
         for j in np.arange(ng):
             self.axes2.plot(sp16+i*self.coverage+j*0.5, s[j,:], color=colors[i])
 
-        # clear axes 1
-        self.axes1.clear()    
-        self.axes1b.clear()    
-        self.axes1c.clear()
-        self.axes1.set_ylabel('Zenith angle [degs]')
-        self.axes1b.set_ylabel('Altitude [ft]',color='green')
-        self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
-            
+        self.axes1.axvline(i*self.coverage, color='gray', linewidth=0.2)            
+        self.axes1.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
         self.axes2.axvline(i*self.coverage, color='gray', linewidth=0.2)            
         self.axes2.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
-        for ii in np.arange(i+1):
-            self.axes1.axvline(ii*self.coverage, color='gray', linewidth=0.2)            
-        self.axes1.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
         self.axes2.yaxis.grid(True)
         labels = np.array(fn, dtype='str')    
         self.axes2.set_xticks((np.arange(len(fn))+0.5)*self.coverage)
@@ -349,6 +346,7 @@ class FluxCanvas(MplCanvas):
         # Shade background of last position
         try:
             # Try removing previous shaded region
+            self.gr1.remove()
             self.gr2.remove()
         except:
             pass
@@ -356,17 +354,32 @@ class FluxCanvas(MplCanvas):
         self.gr2 = self.axes2.axvspan(i*self.coverage, (i+1)*self.coverage, alpha=0.5, color='#E7FFE7')
         
         # Display curves
-        x1 = np.arange(i+1)*self.coverage
-        x2 = np.arange(1,i+2)*self.coverage
-        zalines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,za)]
-        altlines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,alti)]
-        wvlines = [[(xs,y[0]),(xe,y[1])] for xs,xe,y in zip(x1,x2,wv)]
+        xs = i*self.coverage
+        xe = (i+1)*self.coverage
+        self.zalines.append([(xs,za[i][0]),(xe,za[i][1])])
+        self.altlines.append([(xs,alti[i][0]),(xe,alti[i][1])])
+        self.wvlines.append([(xs,wv[i][0]),(xe,wv[i][1])])
         zamin = 32
         zamax = 67
-        cza = ['black' if (y[0] < zamax and y[1] < zamax and y[0] > zamin and y[1] > zamin) else 'red' for y in za]
-        self.zaLayer = mc.LineCollection(zalines, colors=cza, linewidths=1)
-        self.altLayer = mc.LineCollection(altlines, colors='green', linewidths=1)
-        self.wvLayer = mc.LineCollection(wvlines, colors='orange', linewidths=1)
+        if (za[i][0] < zamax and za[i][1] < zamax and za[i][0] > zamin and za[i][1] > zamin):
+            self.cza.append('black')
+        else:
+            self.cza.append('red')
+            
+        #self.axes1.plot([xs,xe],za[i],color=self.cza[i])
+        #self.axes1.plot([xs,xe],alti[i],color='green')
+        #self.axes1.plot([xs,xe],wv[i],color='orange')
+            
+        try:
+            self.zaLayer.remove()
+            self.altLayer.remove()
+            self.wvLayer.remove()
+        except:
+            pass
+
+        self.zaLayer = LineCollection(self.zalines, colors=self.cza, linewidths=1)
+        self.altLayer = LineCollection(self.altlines, colors='green', linewidths=1)
+        self.wvLayer = LineCollection(self.wvlines, colors='orange', linewidths=1)
 
         # Redraw
         self.axes1.add_collection(self.zaLayer)
@@ -664,9 +677,10 @@ class ApplicationWindow(QMainWindow):
 
         # Periodical update
         #self.reduction=False
+        self.numberOfFiles = 0
         timer = QTimer(self)
         timer.timeout.connect(self.update_fifimon)
-        timer.start(3000)
+        timer.start(5000)
 
     def changeVisibility(self):
         state = self.lf.isVisible()
@@ -723,7 +737,7 @@ class ApplicationWindow(QMainWindow):
             n=value['n']
             gp=np.array(value['gp'])
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
-            
+        print "Loading completed "
 
         
     def fileQuit(self):
@@ -741,7 +755,6 @@ class ApplicationWindow(QMainWindow):
         QMessageBox.about(self, "About", message)
 
     def addObs(self, fileGroupId = None, newfiles=False):
-        from fifitools import readData, multiSlopes, Obs
         from astropy.io import fits
         import os
         #import psutil
@@ -830,11 +843,14 @@ class ApplicationWindow(QMainWindow):
                                                                      for o in self.obs if o.fgid == self.fileGroupId)))
         # Display the data
         print "Adding to the plot ",infile
-        #print np.shape(spectra)
+        from timeit import default_timer as timer
+        t1=timer()
         self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
+        t2=timer()
         self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
-              
-    
+        t3=timer()
+        print "Timing ", t2-t1, t3-t2
+        
     def update_fifimon(self):
         '''
         This module is called automatically every n seconds (n=10, typically) to look
@@ -848,7 +864,16 @@ class ApplicationWindow(QMainWindow):
 #            return
 
         from fifitools import exploreDirectory
+
+        # Check if there are new files
         cwd = os.getcwd()
+        files = os.listdir(cwd)
+        if len(files) == self.numberOfFiles:
+            return
+        else:
+            self.numberOfFiles = len(files)
+
+        
         files, start, fgid = exploreDirectory(cwd+"/")
         # Check if new fileGroupID or files added
         try:
@@ -859,6 +884,7 @@ class ApplicationWindow(QMainWindow):
         except:
             pass
 
+            
         for f,fg in zip(files,fgid):
             if f not in self.files:
                 print "updating file list ..."
