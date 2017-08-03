@@ -499,24 +499,38 @@ class ApplicationWindow(QMainWindow):
         }
         QStatusBar {
         background-color: #FFF6BA;
+        border: 1px solid black;
+        border-radius: 3px;
         }
-        QToolBar#tb1 {
+        QToolBar#tb1, QToolBar#tb2, QToolBar#tb {
         background-color: transparent;
         border: 1px transparent;
         }
-        QToolBar#tb2 {
-        background-color: transparent;
-        border: 1px transparent;
+        QToolButton:pressed {
+        background-color: LemonChiffon;
+        border-radius: 3px;
         }
-        QToolBar#tb {
-        background-color: transparent;
-        border: 1px transparent;
+        QToolButton:hover {
+        background-color: LemonChiffon;
+        border-radius: 3px;
         }
-        QIcon {
-        background: 'transparent';
+        QToolButton:focused {
+        background-color: LemonChiffon;
+        border-radius: 3px;
+        }
+        QToolButton:checked {
+        background-color: LemonChiffon;
+        border-radius: 3px;
+        }
+        QToolTip {
+        border: 1px solid black;
+        padding: 2px;
+        border-radius: 3px;
+        opacity: 200;
+        background-color: LemonChiffon;
         }
         """)
-        
+
         # Start exploring directory
         from fifitools import exploreDirectory
         cwd = os.getcwd()
