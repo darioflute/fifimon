@@ -107,35 +107,28 @@ class PositionCanvas(MplCanvas):
         self.axes.plot(np.nan,np.nan)
 
         
-    def updateFigure(self, nod, fn, ra, dec, dx, dy, angle, infile):
-        # Find index of infile
-        i = fn.index(int(infile[:5]))
-        
-        ra=np.asarray(ra)
-        dec=np.asarray(dec)
-        dx=np.asarray(dx)
-        dy=np.asarray(dy)
+    def updateFigure(self, nod, ra, dec, dx, dy, angle, infile):
+
         x = ra+dx-self.w.wcs.crval[0]
         y = dec+dy-self.w.wcs.crval[1]
-        colors = ['blue' if a =='A' else 'red' for a in nod]
-        self.offsets.append((dx[i],dy[i]))
+        color = 'blue' if nod == 'A' else 'red'
+        self.offsets.append((dx,dy))
         self.filename.append(infile)
         
         # Add rectangle patch
         side = 30./3600.
-        theta = -angle[i]*np.pi/180.
+        theta = -angle*np.pi/180.
         dx = side*0.5*(np.cos(theta)-np.sin(theta))
         dy = side*0.5*(np.sin(theta)+np.cos(theta))
-        rect = Rectangle((x[i] - dx, y[i] - dy), side,side,angle=-angle[i],fc='none',ec=colors[i])
+        rect = Rectangle((x - dx, y - dy), side,side,angle=-angle,fc='none',ec=color)
         self.axes.add_patch(rect)
         # Add patch on current position
         try:
             self.greenpatch.remove()
         except:
             pass
-        greenrect = Rectangle((x[i] - dx, y[i] - dy), side,side,angle=-angle[i],fc='#C1FFC1',ec='none',alpha=0.5)
+        greenrect = Rectangle((x - dx, y - dy), side,side,angle=-angle,fc='#C1FFC1',ec='none',alpha=0.5)
         self.greenpatch = self.axes.add_patch(greenrect)
-
         
         # collect the patches to modify them later
         self.rects.append(rect)
@@ -146,6 +139,7 @@ class PositionCanvas(MplCanvas):
             self.axes.set_xlim([xlim[1],xlim[0]])
         # Update figure
         self.draw()
+
 
 class FluxCanvas(MplCanvas):
     """A canvas that updates itself every 3 seconds with a new plot."""
@@ -189,17 +183,15 @@ class FluxCanvas(MplCanvas):
     def onPick(self, event):
         if event.button == 1:
             x = event.xdata
-            # compute the position number, return if it is not defined
+            # Search the label position within the mininum distance
             try:
-                n = int(x // self.coverage)
-            except:
-                return
-            if n >= 0 and n < self.n:
+                pl = np.array(self.labpos)
+                n = np.argmin(np.abs(pl-x))
                 # draw rectangle on flux plot
                 self.gr1.remove()
                 self.gr2.remove()
-                self.gr1 = self.axes1.axvspan(n*self.coverage, (n+1)*self.coverage, alpha=0.5, color='#E7FFE7')
-                self.gr2 = self.axes2.axvspan(n*self.coverage, (n+1)*self.coverage, alpha=0.5, color='#E7FFE7')
+                self.gr1 = self.axes1.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.5, color='#E7FFE7')
+                self.gr2 = self.axes2.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.5, color='#E7FFE7')
                 # update position 
                 pc = self.parent().parent().parent().parent().pc
                 rect = pc.rects[n]
@@ -210,7 +202,10 @@ class FluxCanvas(MplCanvas):
                 fname  = pc.filename[n]
                 mw = self.parent().parent().parent().parent()
                 mw.sb.showMessage("File: "+fname+" --  Offset ("+"{:.0f}".format(offset[0]*3600.)+","+"{:.0f}".format(offset[1]*3600.)+") ",3000)
+            except:
+                print "No data displayed"
 
+                
         elif event.button == 2:    
             self.dragged = event
             self.pick_pos = (event.xdata, event.ydata)
@@ -293,6 +288,11 @@ class FluxCanvas(MplCanvas):
         self.altlines =[]
         self.wvlines = []
         self.cza = []
+        self.labels = []
+        self.labpos = []
+        self.coverage = []
+        self.zamin = 32
+        self.zamax = 67
         # Create box
         self.axes1 = self.fig.add_subplot(211)
         self.axes1.set_xlim([0,20*20]) # Set at least 20 observations
@@ -317,30 +317,36 @@ class FluxCanvas(MplCanvas):
             self.fig.suptitle(fileGroupId)
 
 
-    def updateFigure(self,nod,fn,spec,infile,za,alti,wv):
+    def updateFigure(self,nod,spec,infile,za,alti,wv):
         # get number of grating positions
-        #print "shape spec is: ",np.shape(spec)
-        ng = (np.shape(spec))[1]
-        self.coverage = 16+0.5*ng
+        ng = (np.shape(spec))[0]
+        start = sum(self.coverage)
+        self.coverage.append(16+0.5*(ng-1))
         sp16 = np.arange(16)
-        self.n = len(nod)
-        #print fn
-        i = fn.index(int(infile[:5]))
-        colors = ['blue' if a =='A' else 'red' for a in nod]
-        s = spec[i]
-        for j in np.arange(ng):
-            self.axes2.plot(sp16+i*self.coverage+j*0.5, s[j,:], color=colors[i])
+        self.labels.append(int(infile[:5]))
+        i = len(self.labels)
+        color = 'blue' if nod == 'A' else 'red'
 
-        self.axes1.axvline(i*self.coverage, color='gray', linewidth=0.2)            
-        self.axes1.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
-        self.axes2.axvline(i*self.coverage, color='gray', linewidth=0.2)            
-        self.axes2.axvline(len(fn)*self.coverage, color='gray', linewidth=0.2)
+        lines  = []
+        for j in np.arange(ng):
+            x = sp16+start+j*0.5
+            y = spec[j,:]
+            lines.append(zip(x,y))
+        lc = LineCollection(lines, colors=color, linewidths=1)
+        self.axes2.add_collection(lc)
+            
+        self.axes1.axvline(start, color='gray', linewidth=0.2)            
+        self.axes1.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
+        self.axes2.axvline(start, color='gray', linewidth=0.2)            
+        self.axes2.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
         self.axes2.yaxis.grid(True)
-        labels = np.array(fn, dtype='str')    
-        self.axes2.set_xticks((np.arange(len(fn))+0.5)*self.coverage)
+        # Update labels
+        labels = np.array(self.labels, dtype='str')
+        self.labpos.append(sum(self.coverage)-0.5*self.coverage[i-1])
+        self.axes2.set_xticks(self.labpos)
         self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
         # Set limits around last observation
-        self.axes2.set_xlim([self.coverage*(i-1.5*self.w),self.coverage*(i+0.5*self.w)]) # Set at least 20 observations
+        self.axes2.set_xlim([self.coverage[i-1]*(i-1.5*self.w),self.coverage[i-1]*(i+0.5*self.w)]) # Set at least 20 observations
         self.axes2.autoscale(enable=True,axis='y')
 
         # Shade background of last position
@@ -350,25 +356,19 @@ class FluxCanvas(MplCanvas):
             self.gr2.remove()
         except:
             pass
-        self.gr1 = self.axes1.axvspan(i*self.coverage, (i+1)*self.coverage, alpha=0.5, color='#E7FFE7')
-        self.gr2 = self.axes2.axvspan(i*self.coverage, (i+1)*self.coverage, alpha=0.5, color='#E7FFE7')
+        self.gr1 = self.axes1.axvspan(start, start+self.coverage[i-1], alpha=0.5, color='#E7FFE7')
+        self.gr2 = self.axes2.axvspan(start, start+self.coverage[i-1], alpha=0.5, color='#E7FFE7')
         
         # Display curves
-        xs = i*self.coverage
-        xe = (i+1)*self.coverage
-        self.zalines.append([(xs,za[i][0]),(xe,za[i][1])])
-        self.altlines.append([(xs,alti[i][0]),(xe,alti[i][1])])
-        self.wvlines.append([(xs,wv[i][0]),(xe,wv[i][1])])
-        zamin = 32
-        zamax = 67
-        if (za[i][0] < zamax and za[i][1] < zamax and za[i][0] > zamin and za[i][1] > zamin):
+        xs = start
+        xe = start+self.coverage[i-1]
+        self.zalines.append([(xs,za[0]),(xe,za[1])])
+        self.altlines.append([(xs,alti[0]),(xe,alti[1])])
+        self.wvlines.append([(xs,wv[0]),(xe,wv[1])])
+        if (za[0] < self.zamax and za[1] < self.zamax and za[0] > self.zamin and za[1] > self.zamin):
             self.cza.append('black')
         else:
             self.cza.append('red')
-            
-        #self.axes1.plot([xs,xe],za[i],color=self.cza[i])
-        #self.axes1.plot([xs,xe],alti[i],color='green')
-        #self.axes1.plot([xs,xe],wv[i],color='orange')
             
         try:
             self.zaLayer.remove()
@@ -392,35 +392,8 @@ class FluxCanvas(MplCanvas):
         self.wvLayer.set_visible(self.displayWV)
 
         self.draw()
+        
 
-    def updateFigureMedians(self,nod,fn,spec,infile):
-        # get number of grating positions
-        ng = (np.shape(spec))[1]
-        self.coverage = 16*ng
-        i = fn.index(int(infile[:5]))
-        colors = ['blue' if a =='A' else 'red' for a in nod]
-
-        s = spec[i]
-        x = []
-        y = []
-        for j in np.arange(ng):
-            n0 = int((ng-j)*0.5)
-            n1 = int(16+ng*0.5-n0)
-            x.append(i*ng+j)
-            y.append(np.median(s[j,n0:n1]))
-
-        self.axes2.plot(x,y,color=colors[i] )
-
-        self.axes2.axvline(i*ng, color='gray', linewidth=0.2)            
-        self.axes2.axvline(len(fn)*ng, color='gray', linewidth=0.2)
-        self.axes2.yaxis.grid(True)
-        labels = np.array(fn, dtype='str')    
-        self.axes2.set_xticks((np.arange(len(fn))+0.5)*ng)
-        self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
-        # Set limits around last observation
-        self.axes2.set_xlim([ng*(i-1.5*self.w),ng*(i+0.5*self.w)]) # Set at least 20 observations
-        self.axes2.autoscale(enable=True,axis='y')
-        self.draw()
 
 class myListWidget(QListWidget):
 
@@ -432,76 +405,48 @@ class myListWidget(QListWidget):
         # Trigger event related to item list ....
         mw.addObs(item.text(),False)
 
-
-# We should probably add a threaded class to add observations.
-# In this way, when we are adding observations, the GUI is not blocked and the plot is continuously updated.        
-# check example at: https://nikolak.com/pyqt-threading-tutorial/
-# class AddObs(QThread):
-#     sec_signal = pyqtSignal(str)
-#     def __init__(self, parent=None):
-#         super(Logger, self).__init__(parent)
-#         self.current_time = 0
-#         self.go = True
-
-#     def __del__(self):
-#         self.wait()
-        
-#     def run(self):
-#         #this is a special fxn that's called with the start() fxn
-#         while self.go:
-#             time.sleep(1)
-#             self.sec_signal.emit(str(self.current_time))
-#             self.current_time += 1
     
 class UpdateObjects(QObject):
     from fifitools import Obs
     updateObjects = pyqtSignal(Obs)
 
 
-class WorkerThread(QThread):
+class AddObsThread(QThread):
 
-    #updateObjects = pyqtSignal('QObject')
     updateObjects = UpdateObjects()
     updateFigures = pyqtSignal('QString')
+    updateFilenames = pyqtSignal('QString')
 
     def __init__(self, selFileNames, fileNames, obs, parent=None):
-        super(WorkerThread, self).__init__(parent)
+        super(AddObsThread, self).__init__(parent)
         self.selFileNames = selFileNames
         self.fileNames = fileNames
         self.obs = obs
         
     def run(self):
         from fifitools import readData, multiSlopes, Obs
+        from timeit import default_timer as timer
         for infile in self.selFileNames:
-            #print "infile", infile    
             if infile not in self.fileNames:
-                print "Reading file: ", infile
                 try:
-                    self.fileNames.append(infile)
+                    t1=timer()
                     aor, hk, gratpos, flux = readData(infile+".fits")
-                    #print "flux shape is: ",np.shape(flux)
                     spectra = multiSlopes(flux)
-                    #print "shape of spectrum ", np.shape(spectra)
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
-                    print "shape of spectrum ", np.shape(spectrum)
                     obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos)
+                    t2=timer()
+                    print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
                     # Call this with a signal from thread
-                    #self.update_figures(infile)
-                    #self.emit(SIGNAL('updateObjects(Obj)'),obj)
-                    #self.emit(SIGNAL('updateFigures(QString)'),infile)
                     self.updateObjects.updateObjects.emit(obj)
+                    self.updateFilenames.emit(infile)
                     self.updateFigures.emit(infile)                    
                 except:
                     print "Problems with file: ", infile
-                    #newfiles=True
             else:
-                #if not newfiles:
-                    #print "call update figure"
-                    #self.emit(SIGNAL('updateFigures(QString)'),infile)
                 self.updateFigures.emit(infile)
-        print "Done with thread"
+        print "Done with add observations thread"
 
 
 
@@ -556,16 +501,16 @@ class ApplicationWindow(QMainWindow):
         background-color: #FFF6BA;
         }
         QToolBar#tb1 {
-        background-color: #FFF6BA;
-        border: 1px #FFF6BA;
+        background-color: transparent;
+        border: 1px transparent;
         }
         QToolBar#tb2 {
-        background-color: #FFF6BA;
-        border: 1px #FFF6BA;
+        background-color: transparent;
+        border: 1px transparent;
         }
         QToolBar#tb {
-        background-color: #FFF6BA;
-        border: 1px #FFF6BA;
+        background-color: transparent;
+        border: 1px transparent;
         }
         QIcon {
         background: 'transparent';
@@ -757,7 +702,6 @@ class ApplicationWindow(QMainWindow):
     def addObs(self, fileGroupId = None, newfiles=False):
         from astropy.io import fits
         import os
-        #import psutil
         firstRun = 0
         if fileGroupId != None:
             self.fileGroupId = fileGroupId
@@ -765,15 +709,10 @@ class ApplicationWindow(QMainWindow):
         if self.fileGroupId == None:
             return
             
-        #print "selected file group id is: ", self.fileGroupId
-        #print "current group id is: ", self.fileGroupId    
         mask = self.fgid == self.fileGroupId
         selFiles = self.files[mask]
         selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
         selFileNames = np.array(selFileNames)
-        #print "Files selected are "
-        #print selFileNames
-        # Check if file names already appear in previous list, otherwise append them and read/process/display relative data
 
         if firstRun:
             try:
@@ -788,80 +727,46 @@ class ApplicationWindow(QMainWindow):
             except:
                 print "Failed to read file ",selFileNames[0]
 
-        # Put this in a thread ?
-        self.workerThread = WorkerThread(selFileNames,self.fileNames,self.obs)
-        #self.connect(self.workerThread, SIGNAL('updateFigures(QString)'),self.update_figures,Qt.DirectConnection)
-        #self.connect(self.workerThread, SIGNAL('updateFigures(Obj)'),self.update_objects,Qt.DirectConnection)
-        # New style for PyQt5
-        self.workerThread.updateObjects.updateObjects.connect(self.update_objects)
-        self.workerThread.updateFigures.connect(self.update_figures)
-
-        self.workerThread.start()
+        # Start a thread to fit ramps and plot data
+        self.addObsThread = AddObsThread(selFileNames,self.fileNames,self.obs)
+        self.addObsThread.updateObjects.updateObjects.connect(self.update_objects)
+        self.addObsThread.updateFigures.connect(self.update_figures)
+        self.addObsThread.updateFilenames.connect(self.update_filenames)
+        self.addObsThread.start()
         
-        # for infile in selFileNames:
-        #     #print "infile", infile    
-        #     if infile not in self.fileNames:
-        #         print "Reading file: ", infile
-        #         try:
-        #             self.fileNames.append(infile)
-        #             aor, hk, gratpos, flux = readData(infile+".fits")
-        #             print "flux shape is: ",np.shape(flux)
-        #             spectra = multiSlopes(flux)
-        #             #print "shape of spectrum ", np.shape(spectra)
-        #             spectrum = np.nanmedian(spectra,axis=2)
-        #             detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
-        #             obsdate, coords, offset, angle, za, altitude, wv = hk
-        #             #print "shape of spectrum ", np.shape(spectrum)
-        #             self.obs.append(Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos))
-        #             # Give time to the system to update the GUI
-        #             QApplication.processEvents()
-        #             # Call this with a signal from thread
-        #             self.update_figures(infile)
-        #         except:
-        #             print "Problems with file: ", infile
-        #             #newfiles=True
-        #     else:
-        #         if not newfiles:
-        #             #print "call update figure"
-        #             self.update_figures(infile)
-            # Used memory check
-            #pid = os.getpid()
-            #py = psutil.Process(pid)
-            #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
-            #print('memory use:', memoryUse)
-        # When exiting reset reduction
-        #self.reduction = False
+        # Used memory check
+        #pid = os.getpid()
+        #py = psutil.Process(pid)
+        #memoryUse = py.memory_info()[0]/2.**30  # memory use in GB...I think
+        #print('memory use:', memoryUse)
 
     def update_objects(self, obj):
-        print "Obs updated"
         self.obs.append(obj)
 
-                              
-    def update_figures(self,infile):
-        # Create lists of spectra, nod, positions, and file numbers
-        fn,nod,ra,dec,x,y,angle,spectra,za,alti,wv = map(list, zip(*((o.n,o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv)
-                                                                     for o in self.obs if o.fgid == self.fileGroupId)))
-        # Display the data
-        print "Adding to the plot ",infile
+    def update_filenames(self, infile):
+        self.fileNames.append(infile)
+        
+    def update_figures(self, infile):
         from timeit import default_timer as timer
+
+        # Select obs corresponding to infile
+        n = self.fileNames.index(infile)
+        o = self.obs[n]
+        nod,ra,dec,x,y,angle,spectra,za,alti,wv = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv
         t1=timer()
-        self.fc.updateFigure(nod,fn,spectra,infile,za,alti,wv)
+        self.fc.updateFigure(nod,spectra,infile,za,alti,wv)
         t2=timer()
-        self.pc.updateFigure(nod,fn,ra,dec,x,y,angle,infile)
+        self.pc.updateFigure(nod,ra,dec,x,y,angle,infile)
         t3=timer()
-        print "Timing ", t2-t1, t3-t2
+        print "Plotted ",infile," in ",t2-t1," and ",t3-t2," s"
+
+
         
     def update_fifimon(self):
         '''
         This module is called automatically every n seconds (n=10, typically) to look
         for new files in the directory, update the lists and, eventually, the plot
         '''
-
-        # Check if running reductions
-#        if self.reduction == False:
-#            self.reduction == True
-#        else:
-#            return
 
         from fifitools import exploreDirectory
 
@@ -891,8 +796,6 @@ class ApplicationWindow(QMainWindow):
                 self.files = np.append(self.files,f)
                 self.fgid = np.append(self.fgid, fg)
                 # update plot (if same fileGroupID)
-                # Check this part. It works if reading from fifimon.json and adding new files in the directory.
-                # But does not work if Timer finds new files in the directory ... and restart replotting all the list of files slowing everything down
                 self.addObs(None,True)
             if fg not in self.fgidList:
                 # update fileGroupID list    
@@ -930,7 +833,4 @@ def main():
 
 # Ensure that the app is created once 
 if __name__ == '__main__':
-#    p = Process(target=main)
-#    p.start()
-#    p.join()
     main()
