@@ -17,6 +17,7 @@ from matplotlib.collections import LineCollection
 # Make sure that we are using QT5
 import matplotlib
 matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
 from PyQt5 import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -57,7 +58,7 @@ class MplCanvas(FigureCanvas):
 
 
 class PositionCanvas(MplCanvas):
-    """Simple canvas with a sine plot."""
+    """Simple canvas for positions in the sky"""
     def __init__(self, *args, **kwargs):
         MplCanvas.__init__(self, *args, **kwargs)
         self.cidPress = self.fig.canvas.mpl_connect('scroll_event', self.onWheel)
@@ -78,9 +79,11 @@ class PositionCanvas(MplCanvas):
         self.axes.set_xlim([curr_x0-new_width,curr_x0+new_width])
         self.axes.set_ylim([curr_y0-new_height,curr_y0+new_height])
         # Adjust size of array
+        #self.update()
+        self.draw_idle()
+        #self.fig.canvas.flush_events()
+        #plt.show(block=False)
         
-        self.draw()
-
     def compute_initial_figure(self,ra=None,dec=None):
         from astropy.wcs import WCS
         self.w = WCS(naxis=2)
@@ -105,6 +108,8 @@ class PositionCanvas(MplCanvas):
         self.axes.axis('equal')
         self.axes.coords[0].set_major_formatter('hh:mm:ss')
         self.axes.plot(np.nan,np.nan)
+        #plt.ion()
+        #plt.show(False)
 
         
     def updateFigure(self, nod, ra, dec, dx, dy, angle, infile):
@@ -127,7 +132,7 @@ class PositionCanvas(MplCanvas):
             self.greenpatch.remove()
         except:
             pass
-        greenrect = Rectangle((x - dx, y - dy), side,side,angle=-angle,fc='#C1FFC1',ec='none',alpha=0.5)
+        greenrect = Rectangle((x - dx, y - dy), side,side,angle=-angle,fc='#C1FFC1',ec='none',alpha=0.6)
         self.greenpatch = self.axes.add_patch(greenrect)
         
         # collect the patches to modify them later
@@ -138,11 +143,13 @@ class PositionCanvas(MplCanvas):
         if xlim[0] < xlim[1]:
             self.axes.set_xlim([xlim[1],xlim[0]])
         # Update figure
-        self.draw()
-
+        self.draw_idle()
+        #self.update()
+        #self.fig.canvas.flush_events()
+        #plt.show(block=False)
 
 class FluxCanvas(MplCanvas):
-    """A canvas that updates itself every 3 seconds with a new plot."""
+    """A canvas that show spectra and some housekeeping"""
 
     def __init__(self, *args, **kwargs):
         MplCanvas.__init__(self, *args, **kwargs)
@@ -190,8 +197,8 @@ class FluxCanvas(MplCanvas):
                 # draw rectangle on flux plot
                 self.gr1.remove()
                 self.gr2.remove()
-                self.gr1 = self.axes1.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.5, color='#E7FFE7')
-                self.gr2 = self.axes2.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.5, color='#E7FFE7')
+                self.gr1 = self.axes1.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
+                self.gr2 = self.axes2.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
                 # update position 
                 pc = self.parent().parent().parent().parent().pc
                 rect = pc.rects[n]
@@ -264,6 +271,7 @@ class FluxCanvas(MplCanvas):
             #            self.draw()
             #self.fig.canvas.blit(self.axes.bbox)
             #self.update()
+            # Draw only when idle
             self.draw_idle()
         return True
 
@@ -278,6 +286,8 @@ class FluxCanvas(MplCanvas):
     def compute_initial_figure(self,fileGroupId=None):
         # Clear figure    
         self.fig.clear()
+        #plt.ion()
+        #plt.show(False)
         # Initialize display
         self.displayZA = True
         self.displayAlt = True
@@ -312,6 +322,7 @@ class FluxCanvas(MplCanvas):
         self.axes2 = self.fig.add_subplot(212,sharex=self.axes1)
         self.axes2.set_ylabel('Flux [V/s]')
         self.axes2.plot([0,0],[np.nan,np.nan],'.b')
+        self.axes2.yaxis.grid(True)
         self.fig.subplots_adjust(hspace=0., bottom=0.1)
         if fileGroupId is not None:
             self.fig.suptitle(fileGroupId)
@@ -333,13 +344,12 @@ class FluxCanvas(MplCanvas):
             y = spec[j,:]
             lines.append(zip(x,y))
         lc = LineCollection(lines, colors=color, linewidths=1)
-        self.axes2.add_collection(lc)
+        self.lines = self.axes2.add_collection(lc)
             
         self.axes1.axvline(start, color='gray', linewidth=0.2)            
         self.axes1.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
         self.axes2.axvline(start, color='gray', linewidth=0.2)            
         self.axes2.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
-        self.axes2.yaxis.grid(True)
         # Update labels
         labels = np.array(self.labels, dtype='str')
         self.labpos.append(sum(self.coverage)-0.5*self.coverage[i-1])
@@ -356,8 +366,8 @@ class FluxCanvas(MplCanvas):
             self.gr2.remove()
         except:
             pass
-        self.gr1 = self.axes1.axvspan(start, start+self.coverage[i-1], alpha=0.5, color='#E7FFE7')
-        self.gr2 = self.axes2.axvspan(start, start+self.coverage[i-1], alpha=0.5, color='#E7FFE7')
+        self.gr1 = self.axes1.axvspan(start, start+self.coverage[i-1], alpha=0.6, color='#E7FFE7')
+        self.gr2 = self.axes2.axvspan(start, start+self.coverage[i-1], alpha=0.6, color='#E7FFE7')
         
         # Display curves
         xs = start
@@ -391,8 +401,9 @@ class FluxCanvas(MplCanvas):
         self.zaLayer.set_visible(self.displayZA)
         self.wvLayer.set_visible(self.displayWV)
 
-        self.draw()
-        
+        self.draw_idle()
+        #self.update()
+        self.fig.canvas.flush_events()
 
 
 class myListWidget(QListWidget):
