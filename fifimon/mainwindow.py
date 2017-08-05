@@ -185,7 +185,7 @@ class FluxCanvas(MplCanvas):
             curr_x0 = (curr_xlim[0]+curr_xlim[1])*0.5
             new_width = (curr_xlim[1]-curr_xlim[0])*factor*0.5
             self.axes2.set_xlim([curr_x0-new_width,curr_x0+new_width])
-        self.draw_rubberband()
+        self.draw_idle()
 
     def onPick(self, event):
         if event.button == 1:
