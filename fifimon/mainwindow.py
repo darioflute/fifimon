@@ -185,7 +185,7 @@ class FluxCanvas(MplCanvas):
             curr_x0 = (curr_xlim[0]+curr_xlim[1])*0.5
             new_width = (curr_xlim[1]-curr_xlim[0])*factor*0.5
             self.axes2.set_xlim([curr_x0-new_width,curr_x0+new_width])
-        self.draw()
+        self.draw_rubberband()
 
     def onPick(self, event):
         if event.button == 1:
@@ -203,7 +203,7 @@ class FluxCanvas(MplCanvas):
                 pc = self.parent().parent().parent().parent().pc
                 rect = pc.rects[n]
                 pc.greenpatch.set_xy(rect.get_xy())
-                pc.draw()
+                pc.draw_idle()
                 # write offset in the status bar
                 offset = pc.offsets[n]
                 fname  = pc.filename[n]
@@ -242,18 +242,18 @@ class FluxCanvas(MplCanvas):
         print "Draw zenith angle"    
         self.displayZA ^= True
         self.zaLayer.set_visible(self.displayZA)
-        self.draw()
+        self.draw_idle()
 
     def drawAlt(self):
         self.displayAlt ^= True
         self.altLayer.set_visible(self.displayAlt)
-        self.draw()
+        self.draw_idle()
         print "Draw altitude"    
 
     def drawWV(self):
         self.displayWV ^= True
         self.wvLayer.set_visible(self.displayWV)
-        self.draw()
+        self.draw_idle()
         print "Draw water vapor"    
         
     def onMotion(self, event):
@@ -278,7 +278,7 @@ class FluxCanvas(MplCanvas):
     def onRelease(self, event):
         if self.dragged is not None:
             self.dragged = None
-            self.draw()
+            self.draw_idle()
         return True
 
 
