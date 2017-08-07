@@ -175,7 +175,8 @@ class FluxCanvas(MplCanvas):
         self.w *= factor
 
         modifiers = QApplication.keyboardModifiers()
-        if modifiers == QtCore.Qt.ShiftModifier:
+        # ShiftModifier does not work with MAC OSX ! I have to use control (the Apple icon)
+        if modifiers == Qt.ControlModifier:
             curr_ylim = self.axes2.get_ylim()
             curr_y0 = (curr_ylim[0]+curr_ylim[1])*0.5
             new_height= (curr_ylim[1]-curr_ylim[0])*factor*0.5
@@ -262,10 +263,10 @@ class FluxCanvas(MplCanvas):
             new_pos = (event.xdata,event.ydata)
             deltax = new_pos[0] - self.pick_pos[0]
             deltay = new_pos[1] - self.pick_pos[1]
-            curr_xlim = self.axes.get_xlim()
-            curr_ylim = self.axes.get_ylim()
-            self.axes.set_xlim(curr_xlim-deltax)
-            self.axes.set_ylim(curr_ylim-deltay)
+            curr_xlim = self.axes1.get_xlim()
+            curr_ylim = self.axes1.get_ylim()
+            self.axes1.set_xlim(curr_xlim-deltax)
+            self.axes1.set_ylim(curr_ylim-deltay)
             self.pick_pos = new_pos
             # Not clear how to use blit
             #            self.draw()
@@ -402,8 +403,7 @@ class FluxCanvas(MplCanvas):
         self.wvLayer.set_visible(self.displayWV)
 
         self.draw_idle()
-        #self.update()
-        self.fig.canvas.flush_events()
+#        self.fig.canvas.flush_events()
 
 
 class myListWidget(QListWidget):
@@ -446,7 +446,7 @@ class AddObsThread(QThread):
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
-                    obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos)
+                    obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan)
                     t2=timer()
                     print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
                     # Call this with a signal from thread
@@ -458,7 +458,6 @@ class AddObsThread(QThread):
             else:
                 self.updateFigures.emit(infile)
         print "Done with add observations thread"
-
 
 
 class ApplicationWindow(QMainWindow):
@@ -548,7 +547,7 @@ class ApplicationWindow(QMainWindow):
         # Start exploring directory
         from fifitools import exploreDirectory
         cwd = os.getcwd()
-        self.files, self.start, self.fgid = exploreDirectory(cwd+"/")
+        self.files, self.start, self.fgid, self.ch = exploreDirectory(cwd+"/")
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
         
@@ -580,10 +579,11 @@ class ApplicationWindow(QMainWindow):
 
         # Define sub widgets
         self.pc = PositionCanvas(self.main_widget, width=5, height=4, dpi=100)
-        self.fc = FluxCanvas(self.main_widget, width=8, height=4, dpi=100)
         self.mpl_toolbar = NavigationToolbar(self.pc, self)
         self.mpl_toolbar.pan('on')
         self.mpl_toolbar.setObjectName('tb1')
+
+        self.fc = FluxCanvas(self.main_widget, width=8, height=4, dpi=100)
         self.mpl_toolbar2 = NavigationToolbar(self.fc, self)
         self.mpl_toolbar2.pan('on')
         self.mpl_toolbar2.setObjectName('tb2')
@@ -676,6 +676,7 @@ class ApplicationWindow(QMainWindow):
                 'wv': o.wv,
                 'fgid': o.fgid,
                 'nod': o.nod,
+                'ch': o.ch,
                 'spec': o.spec.tolist()
             }
         with io.open('fifimon.json', mode='w') as f:
@@ -709,7 +710,8 @@ class ApplicationWindow(QMainWindow):
             fgid=value['fgid']
             n=value['n']
             gp=np.array(value['gp'])
-            self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp))
+            ch=value['ch']
+            self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch))
         print "Loading completed "
 
         
@@ -736,12 +738,19 @@ class ApplicationWindow(QMainWindow):
             firstRun = 1
         if self.fileGroupId == None:
             return
-            
-        mask = self.fgid == self.fileGroupId
+
+        mask = (self.fgid == self.fileGroupId) & (self.ch == 'BLUE')
+        # Check if there are files
+        print mask.all()
+        if not mask.all():
+            print "There no files in this channel"
+            return
+        
+        
         selFiles = self.files[mask]
         selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
         selFileNames = np.array(selFileNames)
-
+            
         if firstRun:
             try:
                 # Grab RA-Dec of first file and restart the WCS
@@ -754,6 +763,7 @@ class ApplicationWindow(QMainWindow):
                 self.fc.compute_initial_figure(self.fileGroupId)
             except:
                 print "Failed to read file ",selFileNames[0]
+                return
 
         # Start a thread to fit ramps and plot data
         self.addObsThread = AddObsThread(selFileNames,self.fileNames,self.obs)
@@ -807,13 +817,14 @@ class ApplicationWindow(QMainWindow):
             self.numberOfFiles = len(files)
 
         
-        files, start, fgid = exploreDirectory(cwd+"/")
+        files, start, fgid, ch = exploreDirectory(cwd+"/")
         # Check if new fileGroupID or files added
         try:
             if not self.files:
                 print 'There were no files !'
                 self.files=[]
                 self.fgid=[]
+                self.ch=[]
         except:
             pass
 
@@ -823,6 +834,7 @@ class ApplicationWindow(QMainWindow):
                 print "updating file list ..."
                 self.files = np.append(self.files,f)
                 self.fgid = np.append(self.fgid, fg)
+                self.ch = np.append(self.ch, ch)
                 # update plot (if same fileGroupID)
                 self.addObs(None,True)
             if fg not in self.fgidList:

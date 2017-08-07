@@ -11,12 +11,13 @@ def exploreDirectory(path):
     from datetime import datetime
     
 #    print "path is ",path    
-    files = sorted(glob.glob(path+'*sw.fits'), key=os.path.getctime)
+    files = sorted(glob.glob(path+'*[ls]w.fits'), key=os.path.getctime)
     files = np.array(files)
 
     # Wavelenghts
     start=[]
     fgid=[]
+    ch=[]
     
     for infile in files:
         hlf = fits.open(infile)
@@ -26,19 +27,21 @@ def exploreDirectory(path):
             if proc == 'LEVEL_1':
                 start.append(h['DATE-OBS'])
                 fgid.append(h['FILEGPID'])
+                ch.append(h['DETCHAN'])
         except:
             pass
         hlf.close()
 
     start=np.array(start)
     fgid =np.array(fgid)
+    ch=np.array(ch)
 
     # Ideally I should order by date and time, now only by time
     a = [datetime.strptime(s, '%Y-%m-%dT%H:%M:%S').time() for s in start]
     a = np.array(a)
     s = np.argsort(a)
     
-    return files[s], start[s], fgid[s]
+    return files[s], start[s], fgid[s], ch[s]
 
 
 def readData(fitsfile):
@@ -283,7 +286,7 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
 
 class Obs(object):
     """ Single observation """
-    def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition):
+    def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition,channel):
         self.spec = spectrum
         self.ra = coords[0]
         self.dec = coords[1]
@@ -297,3 +300,4 @@ class Obs(object):
         self.fgid = fileGroupID
         self.n = filenum
         self.nod = nodbeam
+        self.ch=channel
