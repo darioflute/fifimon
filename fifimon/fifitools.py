@@ -10,8 +10,7 @@ def exploreDirectory(path):
     import numpy as np
     from datetime import datetime
     
-#    print "path is ",path    
-    files = sorted(glob.glob(path+'*[ls]w.fits'), key=os.path.getctime)
+    files = sorted(glob.glob(path+'*w.fits'), key=os.path.getctime)
     files = np.array(files)
 
     # Wavelenghts
@@ -34,14 +33,15 @@ def exploreDirectory(path):
 
     start=np.array(start)
     fgid =np.array(fgid)
-    ch=np.array(ch)
+    ch   =np.array(ch)
 
     # Ideally I should order by date and time, now only by time
     a = [datetime.strptime(s, '%Y-%m-%dT%H:%M:%S').time() for s in start]
     a = np.array(a)
     s = np.argsort(a)
-    
+
     return files[s], start[s], fgid[s], ch[s]
+
 
 
 def readData(fitsfile):

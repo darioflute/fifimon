@@ -326,7 +326,8 @@ class FluxCanvas(MplCanvas):
         self.axes2.yaxis.grid(True)
         self.fig.subplots_adjust(hspace=0., bottom=0.1)
         if fileGroupId is not None:
-            self.fig.suptitle(fileGroupId)
+            mw = self.parent().parent().parent().parent()
+            self.fig.suptitle(fileGroupId+" ("+mw.channel+")")
 
 
     def updateFigure(self,nod,spec,infile,za,alti,wv):
@@ -419,7 +420,7 @@ class myListWidget(QListWidget):
     
 class UpdateObjects(QObject):
     from fifitools import Obs
-    updateObjects = pyqtSignal(Obs)
+    newObj = pyqtSignal(Obs)
 
 
 class AddObsThread(QThread):
@@ -428,15 +429,15 @@ class AddObsThread(QThread):
     updateFigures = pyqtSignal('QString')
     updateFilenames = pyqtSignal('QString')
 
-    def __init__(self, selFileNames, fileNames, obs, parent=None):
+    def __init__(self, selFileNames, fileNames, parent=None):
         super(AddObsThread, self).__init__(parent)
         self.selFileNames = selFileNames
         self.fileNames = fileNames
-        self.obs = obs
         
     def run(self):
         from fifitools import readData, multiSlopes, Obs
         from timeit import default_timer as timer
+        print self.selFileNames
         for infile in self.selFileNames:
             if infile not in self.fileNames:
                 try:
@@ -446,12 +447,16 @@ class AddObsThread(QThread):
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
+                    #print "filenum is: ", filenum
                     obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan)
                     t2=timer()
                     print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
                     # Call this with a signal from thread
-                    self.updateObjects.updateObjects.emit(obj)
+                    #print 'update objects with file ', filenum 
+                    self.updateObjects.newObj.emit(obj)
+                    #print 'update filename with file ', filenum 
                     self.updateFilenames.emit(infile)
+                    #print 'update figures with file ', filenum 
                     self.updateFigures.emit(infile)                    
                 except:
                     print "Problems with file: ", infile
@@ -550,6 +555,14 @@ class ApplicationWindow(QMainWindow):
         self.files, self.start, self.fgid, self.ch = exploreDirectory(cwd+"/")
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
+
+        # Set channel to display
+        #channels = list(set(self.ch))
+        #if 'BLUE' in channels:
+        #    self.channel = 'BLUE'
+        #else:
+        #    self.channel = 'RED'
+        #print "Channel is: ", self.channel
         
         # Start list of observations
         self.fileGroupId = None
@@ -610,8 +623,10 @@ class ApplicationWindow(QMainWindow):
             self.lf.addItem(item); 
         self.lf.setWindowTitle('File Group ID')
         self.lf.itemClicked.connect(self.lf.Clicked)
-        
+
+        # Status Bar
         self.sb = QStatusBar()
+        self.sb.showMessage("Welcome to FIFI Monitor!", 10000)
         
         # Layout
         mainLayout = QHBoxLayout(self.main_widget)
@@ -646,10 +661,7 @@ class ApplicationWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
 
 
-        self.sb.showMessage("Welcome to FIFI Monitor!", 10000)
-
         # Periodical update
-        #self.reduction=False
         self.numberOfFiles = 0
         timer = QTimer(self)
         timer.timeout.connect(self.update_fifimon)
@@ -739,10 +751,14 @@ class ApplicationWindow(QMainWindow):
         if self.fileGroupId == None:
             return
 
-        mask = (self.fgid == self.fileGroupId) & (self.ch == 'BLUE')
+        #mask = (self.fgid == self.fileGroupId) & (self.ch == self.channel)
+        mask = self.fgid == self.fileGroupId
+        # Select the channel
+        channels = list(set(self.ch[mask]))
+        self.channel = channels[0]
         # Check if there are files
-        print mask.all()
-        if not mask.all():
+        print "there are ",np.sum(mask)," observations"
+        if np.sum(mask) == 0:
             print "There no files in this channel"
             return
         
@@ -766,8 +782,8 @@ class ApplicationWindow(QMainWindow):
                 return
 
         # Start a thread to fit ramps and plot data
-        self.addObsThread = AddObsThread(selFileNames,self.fileNames,self.obs)
-        self.addObsThread.updateObjects.updateObjects.connect(self.update_objects)
+        self.addObsThread = AddObsThread(selFileNames,self.fileNames)
+        self.addObsThread.updateObjects.newObj.connect(self.update_objects)
         self.addObsThread.updateFigures.connect(self.update_figures)
         self.addObsThread.updateFilenames.connect(self.update_filenames)
         self.addObsThread.start()
@@ -779,9 +795,11 @@ class ApplicationWindow(QMainWindow):
         #print('memory use:', memoryUse)
 
     def update_objects(self, obj):
+        print "updating objects with object ", obj.n
         self.obs.append(obj)
 
     def update_filenames(self, infile):
+        print "updating filenames with file ", infile
         self.fileNames.append(infile)
         
     def update_figures(self, infile):
@@ -790,6 +808,7 @@ class ApplicationWindow(QMainWindow):
         # Select obs corresponding to infile
         n = self.fileNames.index(infile)
         o = self.obs[n]
+        print "updating figure with filename ", n
         nod,ra,dec,x,y,angle,spectra,za,alti,wv = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv
         t1=timer()
         self.fc.updateFigure(nod,spectra,infile,za,alti,wv)
