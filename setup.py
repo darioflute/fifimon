@@ -4,7 +4,7 @@ from distutils.core import setup
 import setuptools
 
 setup(name='fifimon',
-      version='0.20.alpha',
+      version='0.19.alpha',
       description='FIFI-LS Monitor',
       long_description='The package monitors FIFI-LS data',
       author='Dario Fadda',
