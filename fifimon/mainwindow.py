@@ -78,11 +78,7 @@ class PositionCanvas(MplCanvas):
         new_height= (curr_ylim[1]-curr_ylim[0])*factor*0.5
         self.axes.set_xlim([curr_x0-new_width,curr_x0+new_width])
         self.axes.set_ylim([curr_y0-new_height,curr_y0+new_height])
-        # Adjust size of array
-        #self.update()
         self.draw_idle()
-        #self.fig.canvas.flush_events()
-        #plt.show(block=False)
         
     def compute_initial_figure(self,ra=None,dec=None):
         from astropy.wcs import WCS
@@ -144,9 +140,6 @@ class PositionCanvas(MplCanvas):
             self.axes.set_xlim([xlim[1],xlim[0]])
         # Update figure
         self.draw_idle()
-        #self.update()
-        #self.fig.canvas.flush_events()
-        #plt.show(block=False)
 
 class FluxCanvas(MplCanvas):
     """A canvas that show spectra and some housekeeping"""
@@ -268,10 +261,6 @@ class FluxCanvas(MplCanvas):
             self.axes1.set_xlim(curr_xlim-deltax)
             self.axes1.set_ylim(curr_ylim-deltay)
             self.pick_pos = new_pos
-            # Not clear how to use blit
-            #            self.draw()
-            #self.fig.canvas.blit(self.axes.bbox)
-            #self.update()
             # Draw only when idle
             self.draw_idle()
         return True
@@ -287,8 +276,6 @@ class FluxCanvas(MplCanvas):
     def compute_initial_figure(self,fileGroupId=None):
         # Clear figure    
         self.fig.clear()
-        #plt.ion()
-        #plt.show(False)
         # Initialize display
         self.displayZA = True
         self.displayAlt = True
@@ -357,8 +344,8 @@ class FluxCanvas(MplCanvas):
         self.labpos.append(sum(self.coverage)-0.5*self.coverage[i-1])
         self.axes2.set_xticks(self.labpos)
         self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
-        # Set limits around last observation
-        self.axes2.set_xlim([self.coverage[i-1]*(i-1.5*self.w),self.coverage[i-1]*(i+0.5*self.w)]) # Set at least 20 observations
+        # Set limits around last observation (at least 20 observations)
+        self.axes2.set_xlim([self.coverage[i-1]*(i-1.5*self.w),self.coverage[i-1]*(i+0.5*self.w)])
         self.axes2.autoscale(enable=True,axis='y')
 
         # Shade background of last position
@@ -404,7 +391,6 @@ class FluxCanvas(MplCanvas):
         self.wvLayer.set_visible(self.displayWV)
 
         self.draw_idle()
-#        self.fig.canvas.flush_events()
 
 
 class myListWidget(QListWidget):
@@ -437,7 +423,6 @@ class AddObsThread(QThread):
     def run(self):
         from fifitools import readData, multiSlopes, Obs
         from timeit import default_timer as timer
-        #print self.selFileNames
         for infile in self.selFileNames:
             if infile not in self.fileNames:
                 try:
@@ -447,22 +432,20 @@ class AddObsThread(QThread):
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
-                    #print "filenum is: ", filenum
                     obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan)
                     t2=timer()
                     print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
                     # Call this with a signal from thread
-                    #print 'update objects with file ', filenum 
                     self.updateObjects.newObj.emit(obj)
-                    #print 'update filename with file ', filenum 
                     self.updateFilenames.emit(infile)
-                    #print 'update figures with file ', filenum 
                     self.updateFigures.emit(infile)
                 except:
                     print "Problems with file: ", infile
             else:
                 self.updateFigures.emit(infile)
         print "Done adding observations thread"
+        # Disconnect signal at the end of the thread
+        self.updateObjects.newObj.disconnect()
 
 
 class ApplicationWindow(QMainWindow):
@@ -556,14 +539,6 @@ class ApplicationWindow(QMainWindow):
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
 
-        # Set channel to display
-        #channels = list(set(self.ch))
-        #if 'BLUE' in channels:
-        #    self.channel = 'BLUE'
-        #else:
-        #    self.channel = 'RED'
-        #print "Channel is: ", self.channel
-        
         # Start list of observations
         self.fileGroupId = None
 
@@ -623,7 +598,6 @@ class ApplicationWindow(QMainWindow):
             self.lf.addItem(item); 
         self.lf.setWindowTitle('File Group ID')
         self.lf.itemClicked.connect(self.lf.Clicked)
-
         # Status Bar
         self.sb = QStatusBar()
         self.sb.showMessage("Welcome to FIFI Monitor!", 10000)
@@ -751,7 +725,6 @@ class ApplicationWindow(QMainWindow):
         if self.fileGroupId == None:
             return
 
-        #mask = (self.fgid == self.fileGroupId) & (self.ch == self.channel)
         mask = self.fgid == self.fileGroupId
         # Select the channel
         channels = list(set(self.ch[mask]))
@@ -780,16 +753,6 @@ class ApplicationWindow(QMainWindow):
             except:
                 print "Failed to read file ",selFileNames[0]
                 return
-
-        # number of file added
-        #self.n = None    
-                
-        # Start a thread to fit ramps and plot data
-        # First disconnect previous thread, otherwise is called again
-        try:
-            self.addObsThread.updateObjects.newObj.disconnect()
-        except:
-            pass
             
         self.addObsThread = AddObsThread(selFileNames,self.fileNames)
         self.addObsThread.updateObjects.newObj.connect(self.update_objects)
@@ -804,23 +767,12 @@ class ApplicationWindow(QMainWindow):
         #print('memory use:', memoryUse)
 
     def update_objects(self, obj):
-        #print "updating objects with object ", obj.n
-        # Check if already there ... until I discover how to treat the bug 
-        #if self.n == None:
-        #    self.n = obj.n
-        #    self.obs.append(obj)
-        #else:
-        #    if obj.n == self.n:
-        #        pass
-        #    else:
-        #        self.obs.append(obj)
-        #        self.n = obj.n
         self.obs.append(obj)
         
     def update_filenames(self, infile):
         #print "updating filenames with file ", infile
         self.fileNames.append(infile)
-        
+      
     def update_figures(self, infile):
         from timeit import default_timer as timer
 
