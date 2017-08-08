@@ -296,17 +296,24 @@ class FluxCanvas(MplCanvas):
         self.axes1.set_xlim([0,20*20]) # Set at least 20 observations
         self.axes1.set_ylim([25,75])
         self.axes1.set_ylabel('Zenith angle [degs]')
+        self.axes1.get_yaxis().set_tick_params(which='both', direction='in',colors='black', right='on',pad=-20)
+        self.axes1.yaxis.set_label_coords(-0.07,0.5)
         self.axes1b = self.axes1.twinx()
         self.axes1b.set_ylim([36000,45000])
         self.axes1b.get_yaxis().set_tick_params(labelright='on',right='on')            
         self.axes1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
-        self.axes1b.yaxis.set_label_coords(-0.13,0.5)
+        self.axes1b.yaxis.set_label_coords(-0.15,0.5)
         self.axes1b.set_ylabel('Altitude [ft]',color='green')
         self.axes1c = self.axes1.twinx()
         self.axes1c.set_ylim([1,100])
         self.axes1c.tick_params(labelright='on',right='on',direction='in',pad=-20,colors='orange')
-        self.axes1c.yaxis.set_label_coords(-0.11,0.5)
+        self.axes1c.yaxis.set_label_coords(-0.13,0.5)
         self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
+        self.axes1d = self.axes1.twinx()
+        self.axes1d.get_yaxis().set_tick_params(which='both', direction='out',colors='blue')
+        self.axes1d.get_yaxis().set_tick_params(labelleft='on', left='on',labelright='off',right='off')
+        self.axes1d.yaxis.set_label_coords(-0.11,0.5)
+        self.axes1d.set_ylabel('Grating pos',color='blue')    
         self.axes2 = self.fig.add_subplot(212,sharex=self.axes1)
         self.axes2.set_ylabel('Flux [V/s]')
         self.axes2.plot([0,0],[np.nan,np.nan],'.b')
@@ -317,7 +324,7 @@ class FluxCanvas(MplCanvas):
             self.fig.suptitle(fileGroupId+" ("+mw.channel+")")
 
 
-    def updateFigure(self,nod,spec,infile,za,alti,wv):
+    def updateFigure(self,nod,spec,infile,za,alti,wv,gp):
         # get number of grating positions
         ng = (np.shape(spec))[0]
         start = sum(self.coverage)
@@ -390,6 +397,10 @@ class FluxCanvas(MplCanvas):
         self.zaLayer.set_visible(self.displayZA)
         self.wvLayer.set_visible(self.displayWV)
 
+        # Add grating position in blue
+        self.axes1d.plot(xs+0.5*np.arange(ng), gp*.001,'.',color=color)
+        self.axes1d.autoscale(enable=True,axis='y')
+        
         self.draw_idle()
 
 
@@ -780,9 +791,9 @@ class ApplicationWindow(QMainWindow):
         n = self.fileNames.index(infile)
         o = self.obs[n]
         #print "updating figure with filename ", n
-        nod,ra,dec,x,y,angle,spectra,za,alti,wv = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv
+        nod,ra,dec,x,y,angle,spectra,za,alti,wv,gp = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv,o.gp
         t1=timer()
-        self.fc.updateFigure(nod,spectra,infile,za,alti,wv)
+        self.fc.updateFigure(nod,spectra,infile,za,alti,wv,gp)
         t2=timer()
         self.pc.updateFigure(nod,ra,dec,x,y,angle,infile)
         t3=timer()
