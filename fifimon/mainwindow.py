@@ -420,7 +420,7 @@ class myListWidget(QListWidget):
     
 class UpdateObjects(QObject):
     from fifitools import Obs
-    newObj = pyqtSignal(Obs)
+    newObj = pyqtSignal([Obs])
 
 
 class AddObsThread(QThread):
@@ -437,7 +437,7 @@ class AddObsThread(QThread):
     def run(self):
         from fifitools import readData, multiSlopes, Obs
         from timeit import default_timer as timer
-        print self.selFileNames
+        #print self.selFileNames
         for infile in self.selFileNames:
             if infile not in self.fileNames:
                 try:
@@ -457,12 +457,12 @@ class AddObsThread(QThread):
                     #print 'update filename with file ', filenum 
                     self.updateFilenames.emit(infile)
                     #print 'update figures with file ', filenum 
-                    self.updateFigures.emit(infile)                    
+                    self.updateFigures.emit(infile)
                 except:
                     print "Problems with file: ", infile
             else:
                 self.updateFigures.emit(infile)
-        print "Done with add observations thread"
+        print "Done adding observations thread"
 
 
 class ApplicationWindow(QMainWindow):
@@ -781,7 +781,16 @@ class ApplicationWindow(QMainWindow):
                 print "Failed to read file ",selFileNames[0]
                 return
 
+        # number of file added
+        #self.n = None    
+                
         # Start a thread to fit ramps and plot data
+        # First disconnect previous thread, otherwise is called again
+        try:
+            self.addObsThread.updateObjects.newObj.disconnect()
+        except:
+            pass
+            
         self.addObsThread = AddObsThread(selFileNames,self.fileNames)
         self.addObsThread.updateObjects.newObj.connect(self.update_objects)
         self.addObsThread.updateFigures.connect(self.update_figures)
@@ -795,11 +804,21 @@ class ApplicationWindow(QMainWindow):
         #print('memory use:', memoryUse)
 
     def update_objects(self, obj):
-        print "updating objects with object ", obj.n
+        #print "updating objects with object ", obj.n
+        # Check if already there ... until I discover how to treat the bug 
+        #if self.n == None:
+        #    self.n = obj.n
+        #    self.obs.append(obj)
+        #else:
+        #    if obj.n == self.n:
+        #        pass
+        #    else:
+        #        self.obs.append(obj)
+        #        self.n = obj.n
         self.obs.append(obj)
-
+        
     def update_filenames(self, infile):
-        print "updating filenames with file ", infile
+        #print "updating filenames with file ", infile
         self.fileNames.append(infile)
         
     def update_figures(self, infile):
@@ -808,7 +827,7 @@ class ApplicationWindow(QMainWindow):
         # Select obs corresponding to infile
         n = self.fileNames.index(infile)
         o = self.obs[n]
-        print "updating figure with filename ", n
+        #print "updating figure with filename ", n
         nod,ra,dec,x,y,angle,spectra,za,alti,wv = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv
         t1=timer()
         self.fc.updateFigure(nod,spectra,infile,za,alti,wv)
