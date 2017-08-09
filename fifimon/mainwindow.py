@@ -2,7 +2,9 @@
 # Using UTF8 encoding
 # -*- coding: utf-8 -*-
 # encoding=utf8
-
+import sys
+#reload(sys)
+#sys.setdefaultencoding("utf-8")
 # Creating the GUI
 
 
@@ -18,8 +20,7 @@ from matplotlib.collections import LineCollection
 # Make sure that we are using QT5
 import matplotlib
 matplotlib.use('Qt5Agg')
-import matplotlib.pyplot as plt
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -29,7 +30,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QObject
 
 
-import os, sys
+import os
 import numpy as np
 #old_settings = np.seterr(all='ignore')  # Avoid warning messages
 import warnings
@@ -291,6 +292,7 @@ class FluxCanvas(MplCanvas):
         self.labpos = []
         self.coverage = []
         self.wvl = []
+        self.wdict = {'0':0}
         self.zamin = 32
         self.zamax = 67
         # Create box
@@ -406,10 +408,15 @@ class FluxCanvas(MplCanvas):
         mw = self.parent().parent().parent().parent()
         j=0
         for g in gp:
+            if g in self.wdict:
+                waves = self.wdict[g]
+            else:
+                l,lw = waveCal(gratpos=g, order=order, array=mw.channel,dichroic=dichroic,obsdate=obsdate)
+                waves = l[12,:]
+                self.wdict[g]=waves
             x = sp16+start+j*0.5
-            l,lw = waveCal(gratpos=g, order=order, array=mw.channel,dichroic=dichroic,obsdate=obsdate)
-            self.axes1d.plot(x,l[12,:],'.',color=color)
-            self.wvl.append(l[12,:])  # Conserve the central wavelengths
+            self.axes1d.plot(x,waves,'.',color=color)
+            self.wvl.append(waves)  # Conserve the central wavelengths
             j += 1
         self.axes1d.autoscale(enable=True,axis='y')        
         self.draw_idle()
@@ -437,11 +444,13 @@ class AddObsThread(QThread):
     updateObjects = UpdateObjects()
     updateFigures = pyqtSignal('QString')
     updateFilenames = pyqtSignal('QString')
+    updateStatus = pyqtSignal('QString')
 
-    def __init__(self, selFileNames, fileNames, parent=None):
+    def __init__(self, selFileNames, fileNames, processAll, parent=None):
         super(AddObsThread, self).__init__(parent)
         self.selFileNames = selFileNames
         self.fileNames = fileNames
+        self.processAll = processAll
         
     def run(self):
         from fifitools import readData, multiSlopes, Obs
@@ -467,6 +476,8 @@ class AddObsThread(QThread):
             else:
                 self.updateFigures.emit(infile)
         print "Done adding observations thread"
+        if self.processAll:
+            self.updateStatus.emit('next')
         # Disconnect signal at the end of the thread
         self.updateObjects.newObj.disconnect()
 
@@ -607,11 +618,15 @@ class ApplicationWindow(QMainWindow):
         hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
+        procAction = QAction(QIcon(path0+'/icons/gears.png'), 'Process all data', self)
+        procAction.setShortcut('Ctrl+P')
+        procAction.triggered.connect(self.processAll)
 
         # Toolbar
         self.tb = QToolBar()
         self.tb.setMovable(True)
         self.tb.addAction(hideAction)
+        self.tb.addAction(procAction)
         self.tb.addAction(exitAction)
         self.tb.setObjectName('tb')
         
@@ -657,7 +672,9 @@ class ApplicationWindow(QMainWindow):
         self.main_widget.setFocus()
         self.setCentralWidget(self.main_widget)
 
-
+        # Thread status
+        self.threadStatus = 'done'    
+        
         # Periodical update
         self.numberOfFiles = 0
         timer = QTimer(self)
@@ -668,8 +685,17 @@ class ApplicationWindow(QMainWindow):
         state = self.lf.isVisible()
         self.lf.setVisible(not state)
 
+    def processAll(self):
+        ''' Action to process everything in the directory '''
+
+        self.processItem = 0
+        item = self.fgidList[self.processItem]
+        self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+        self.addObs(item, False, True)
+
+        
     def saveData(self):
-        import json, io, codecs
+        import json, io
         
         data = {}
         for fn,o in zip(self.fileNames,self.obs):
@@ -706,7 +732,7 @@ class ApplicationWindow(QMainWindow):
         # Read the json file as ordered dictionary to preserve the
         # order the objects were saved
         with open('fifimon.json') as f:
-            data = json.load(f, object_pairs_hook=OrderedDict)
+            data = json.load(f, object_pairs_hook=OrderedDict, encoding='utf-8')
 
         for key,value in data.iteritems():
             self.fileNames.append(key)
@@ -724,7 +750,8 @@ class ApplicationWindow(QMainWindow):
             n=value['n']
             gp=np.array(value['gp'])
             ch=value['ch']
-            obsdate=value['obsdate']
+            # Damn observation date has a character in latin-1 !
+            obsdate=value['obsdate'].decode('latin-1').encode('utf-8')
             order=value['order']
             dichroic=value['dichroic']
             print obsdate
@@ -746,7 +773,7 @@ class ApplicationWindow(QMainWindow):
         message=file.read()
         QMessageBox.about(self, "About", message)
 
-    def addObs(self, fileGroupId = None, newfiles=False):
+    def addObs(self, fileGroupId = None, newfiles=False, processAll=False):
         from astropy.io import fits
         import os
         firstRun = 0
@@ -784,11 +811,13 @@ class ApplicationWindow(QMainWindow):
             except:
                 print "Failed to read file ",selFileNames[0]
                 return
+        
             
-        self.addObsThread = AddObsThread(selFileNames,self.fileNames)
+        self.addObsThread = AddObsThread(selFileNames,self.fileNames,processAll)
         self.addObsThread.updateObjects.newObj.connect(self.update_objects)
         self.addObsThread.updateFigures.connect(self.update_figures)
         self.addObsThread.updateFilenames.connect(self.update_filenames)
+        self.addObsThread.updateStatus.connect(self.update_status)
         self.addObsThread.start()
         
         # Used memory check
@@ -799,7 +828,15 @@ class ApplicationWindow(QMainWindow):
 
     def update_objects(self, obj):
         self.obs.append(obj)
-        
+
+    def update_status(self, status):
+        ''' process next item is available '''
+        self.processItem += 1
+        if self.processItem < len(self.fgidList):
+            item = self.fgidList[self.processItem]
+            self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+            self.addObs(item, False, True)
+            
     def update_filenames(self, infile):
         #print "updating filenames with file ", infile
         self.fileNames.append(infile)
