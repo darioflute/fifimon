@@ -23,7 +23,9 @@ def exploreDirectory(path):
         try:
             h = hlf[0].header
             proc = h['PROCSTAT']
+            obstype = h['OBSTYPE']
             if proc == 'LEVEL_1':
+                #if obstype == 'OBJECT':
                 start.append(h['DATE-OBS'])
                 fgid.append(h['FILEGPID'])
                 ch.append(h['DETCHAN'])
@@ -54,8 +56,13 @@ def readData(fitsfile):
     data = scidata.DATA
     hdulist.close()
     procstat = header['PROCSTAT']
-    if procstat != 'LEVEL_1':
-        print "This program works only with raw FIFI-LS files (Level 1)"    
+    obstype = header['OBSTYPE']
+    if obstype != 'OBJECT':
+        print " This program works only with type OBJECT"
+        print fitsfile, "is a ", obstype, " file"
+        exit
+    elif procstat != 'LEVEL_1':
+        print "This program works only with raw FIFI-LS files (Level 1)"
         exit
     else:
         detchan = header['DETCHAN']
