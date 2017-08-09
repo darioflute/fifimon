@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # Using UTF8 encoding
 # -*- coding: utf-8 -*-
+# encoding=utf8
 
 # Creating the GUI
 
@@ -289,6 +290,7 @@ class FluxCanvas(MplCanvas):
         self.labels = []
         self.labpos = []
         self.coverage = []
+        self.wvl = []
         self.zamin = 32
         self.zamax = 67
         # Create box
@@ -313,7 +315,7 @@ class FluxCanvas(MplCanvas):
         self.axes1d.get_yaxis().set_tick_params(which='both', direction='out',colors='blue')
         self.axes1d.get_yaxis().set_tick_params(labelleft='on', left='on',labelright='off',right='off')
         self.axes1d.yaxis.set_label_coords(-0.11,0.5)
-        self.axes1d.set_ylabel('Grating pos',color='blue')    
+        self.axes1d.set_ylabel('Wavelength [$\mu$m]',color='blue')    
         self.axes2 = self.fig.add_subplot(212,sharex=self.axes1)
         self.axes2.set_ylabel('Flux [V/s]')
         self.axes2.plot([0,0],[np.nan,np.nan],'.b')
@@ -324,7 +326,8 @@ class FluxCanvas(MplCanvas):
             self.fig.suptitle(fileGroupId+" ("+mw.channel+")")
 
 
-    def updateFigure(self,nod,spec,infile,za,alti,wv,gp):
+    def updateFigure(self,nod,spec,infile,za,alti,wv,gp,order,obsdate,dichroic):
+        from fifitools import waveCal        
         # get number of grating positions
         ng = (np.shape(spec))[0]
         start = sum(self.coverage)
@@ -398,11 +401,20 @@ class FluxCanvas(MplCanvas):
         self.wvLayer.set_visible(self.displayWV)
 
         # Add grating position in blue
-        self.axes1d.plot(xs+0.5*np.arange(ng), gp*.001,'.',color=color)
-        self.axes1d.autoscale(enable=True,axis='y')
-        
+        #self.axes1d.plot(xs+0.5*np.arange(ng), gp*.001,'.',color=color)
+        # Compute wavelenghts and plot them
+        mw = self.parent().parent().parent().parent()
+        j=0
+        for g in gp:
+            x = sp16+start+j*0.5
+            l,lw = waveCal(gratpos=g, order=order, array=mw.channel,dichroic=dichroic,obsdate=obsdate)
+            self.axes1d.plot(x,l[12,:],'.',color=color)
+            self.wvl.append(l[12,:])  # Conserve the central wavelengths
+            j += 1
+        self.axes1d.autoscale(enable=True,axis='y')        
         self.draw_idle()
-
+        ww = np.array(self.wvl)
+        mw.sb.showMessage("Wavelength: "+"{:.1f}".format(np.min(ww))+" - "+"{:.1f}".format(np.median(ww))+" - "+"{:.1f}".format(np.max(ww)),5000)
 
 class myListWidget(QListWidget):
 
@@ -443,7 +455,7 @@ class AddObsThread(QThread):
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
-                    obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan)
+                    obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     t2=timer()
                     print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
                     # Call this with a signal from thread
@@ -657,7 +669,8 @@ class ApplicationWindow(QMainWindow):
         self.lf.setVisible(not state)
 
     def saveData(self):
-        import json, io
+        import json, io, codecs
+        
         data = {}
         for fn,o in zip(self.fileNames,self.obs):
             data[fn] = {
@@ -674,11 +687,14 @@ class ApplicationWindow(QMainWindow):
                 'fgid': o.fgid,
                 'nod': o.nod,
                 'ch': o.ch,
+                'order': o.order,
+                'obsdate': o.obsdate,
+                'dichroic': o.dichroic,
                 'spec': o.spec.tolist()
             }
         with io.open('fifimon.json', mode='w') as f:
             str_= json.dumps(data,indent=2,sort_keys=True,
-                             separators=(',',': '), ensure_ascii=False)
+                             separators=(',',': '), ensure_ascii=False,encoding='utf-8')
             f.write(unicode(str_))
         pass    
 
@@ -708,7 +724,11 @@ class ApplicationWindow(QMainWindow):
             n=value['n']
             gp=np.array(value['gp'])
             ch=value['ch']
-            self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch))
+            obsdate=value['obsdate']
+            order=value['order']
+            dichroic=value['dichroic']
+            print obsdate
+            self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
         print "Loading completed "
 
         
@@ -791,9 +811,9 @@ class ApplicationWindow(QMainWindow):
         n = self.fileNames.index(infile)
         o = self.obs[n]
         #print "updating figure with filename ", n
-        nod,ra,dec,x,y,angle,spectra,za,alti,wv,gp = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv,o.gp
+        nod,ra,dec,x,y,angle,spectra,za,alti,wv,gp,order,obsdate,dichroic = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv,o.gp,o.order,o.obsdate,o.dichroic
         t1=timer()
-        self.fc.updateFigure(nod,spectra,infile,za,alti,wv,gp)
+        self.fc.updateFigure(nod,spectra,infile,za,alti,wv,gp,order,obsdate,dichroic)
         t2=timer()
         self.pc.updateFigure(nod,ra,dec,x,y,angle,infile)
         t3=timer()

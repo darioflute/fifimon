@@ -217,6 +217,7 @@ def multiSlopes(data):
 def waveCal(gratpos,dichroic,obsdate,array,order):
     import numpy as np
     import pandas as pd
+    import os
     
     '''
     Usage:
@@ -236,8 +237,8 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
     month = obsdate.split('-')[1]   
     odate = year[2:]+month
         
-    path = '/Users/dfadda/Pipeline/Repository/fifi-ls/data/wave_cal/CalibrationResults.csv'
-    wvdf = pd.read_csv(path, header=[0, 1])
+    path0,file0 = os.path.split(__file__)
+    wvdf = pd.read_csv(path0+'/CalibrationResults.csv', header=[0, 1])
     ndates = (len(wvdf.columns)-2)//5
     dates = np.zeros(ndates)
     for i in range(ndates):
@@ -293,7 +294,7 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
 
 class Obs(object):
     """ Single observation """
-    def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition,channel):
+    def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition,channel,order,obsdate,dichroic):
         self.spec = spectrum
         self.ra = coords[0]
         self.dec = coords[1]
@@ -308,3 +309,6 @@ class Obs(object):
         self.n = filenum
         self.nod = nodbeam
         self.ch=channel
+        self.order=order
+        self.obsdate=obsdate
+        self.dichroic=dichroic
