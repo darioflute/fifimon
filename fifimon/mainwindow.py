@@ -443,6 +443,7 @@ class AddObsThread(QThread):
 
     updateObjects = UpdateObjects()
     updateFigures = pyqtSignal('QString')
+    updateExclude = pyqtSignal('QString')
     updateFilenames = pyqtSignal('QString')
     updateStatus = pyqtSignal('QString')
 
@@ -473,6 +474,7 @@ class AddObsThread(QThread):
                     self.updateFigures.emit(infile)
                 except:
                     print "Problems with file: ", infile
+                    self.updateExclude.emit(infile)
             else:
                 self.updateFigures.emit(infile)
         print "Done adding observations thread"
@@ -681,6 +683,10 @@ class ApplicationWindow(QMainWindow):
         timer.timeout.connect(self.update_fifimon)
         timer.start(5000)
 
+        # Open file to collect problematic files
+        self.excludefile = open('fifimon.exclude','w')
+
+        
     def changeVisibility(self):
         state = self.lf.isVisible()
         self.lf.setVisible(not state)
@@ -760,7 +766,8 @@ class ApplicationWindow(QMainWindow):
 
         
     def fileQuit(self):
-        self.saveData()    
+        self.saveData()
+        self.excludefile.close()
         self.close()
 
     def closeEvent(self, ce):
@@ -816,6 +823,7 @@ class ApplicationWindow(QMainWindow):
         self.addObsThread = AddObsThread(selFileNames,self.fileNames,processAll)
         self.addObsThread.updateObjects.newObj.connect(self.update_objects)
         self.addObsThread.updateFigures.connect(self.update_figures)
+        self.addObsThread.updateExclude.connect(self.update_exclude)
         self.addObsThread.updateFilenames.connect(self.update_filenames)
         self.addObsThread.updateStatus.connect(self.update_status)
         self.addObsThread.start()
@@ -829,6 +837,9 @@ class ApplicationWindow(QMainWindow):
     def update_objects(self, obj):
         self.obs.append(obj)
 
+    def update_exclude(self, infile):
+        self.excludefile.write(infile)
+        
     def update_status(self, status):
         ''' process next item is available '''
         self.processItem += 1
