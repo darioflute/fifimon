@@ -306,18 +306,19 @@ class FluxCanvas(MplCanvas):
         self.axes1b.set_ylim([36000,45000])
         self.axes1b.get_yaxis().set_tick_params(labelright='on',right='on')            
         self.axes1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
-        self.axes1b.yaxis.set_label_coords(-0.15,0.5)
+        self.axes1b.yaxis.set_label_coords(-0.16,0.5)
         self.axes1b.set_ylabel('Altitude [ft]',color='green')
         self.axes1c = self.axes1.twinx()
         self.axes1c.set_ylim([1,100])
         self.axes1c.tick_params(labelright='on',right='on',direction='in',pad=-20,colors='orange')
-        self.axes1c.yaxis.set_label_coords(-0.13,0.5)
+        self.axes1c.yaxis.set_label_coords(-0.14,0.5)
         self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
         self.axes1d = self.axes1.twinx()
         self.axes1d.get_yaxis().set_tick_params(which='both', direction='out',colors='blue')
         self.axes1d.get_yaxis().set_tick_params(labelleft='on', left='on',labelright='off',right='off')
-        self.axes1d.yaxis.set_label_coords(-0.11,0.5)
+        self.axes1d.yaxis.set_label_coords(-0.12,0.5)
         self.axes1d.set_ylabel('Wavelength [$\mu$m]',color='blue')    
+        self.axes1d.set_ylim([50,200])
         self.axes2 = self.fig.add_subplot(212,sharex=self.axes1)
         self.axes2.set_ylabel('Flux [V/s]')
         self.axes2.plot([0,0],[np.nan,np.nan],'.b')
@@ -572,9 +573,11 @@ class ApplicationWindow(QMainWindow):
         from fifitools import exploreDirectory
         cwd = os.getcwd()
         self.files, self.start, self.fgid, self.ch = exploreDirectory(cwd+"/")
+        print "Directory scanned"
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
-
+        
+        
         # Start list of observations
         self.fileGroupId = None
 
@@ -585,7 +588,9 @@ class ApplicationWindow(QMainWindow):
             self.loadData()
         except:
             pass
-
+        self.flightmode = False
+        self.excludedFiles = []
+            
         # Menu
         self.file_menu = self.menuBar().addMenu('&File')
         self.quit_program = QAction('Quit',self,shortcut='Ctrl+q',triggered=self.fileQuit)
@@ -623,12 +628,17 @@ class ApplicationWindow(QMainWindow):
         procAction = QAction(QIcon(path0+'/icons/gears.png'), 'Process all data', self)
         procAction.setShortcut('Ctrl+P')
         procAction.triggered.connect(self.processAll)
-
+        flyAction = QAction(QIcon(path0+'/icons/plane.png'), 'Switch between flight and QA mode', self)
+        flyAction.setShortcut('Ctrl+F')
+        flyAction.triggered.connect(self.flightMode)
+        
+        
         # Toolbar
         self.tb = QToolBar()
         self.tb.setMovable(True)
         self.tb.addAction(hideAction)
         self.tb.addAction(procAction)
+        self.tb.addAction(flyAction)
         self.tb.addAction(exitAction)
         self.tb.setObjectName('tb')
         
@@ -675,18 +685,10 @@ class ApplicationWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
 
         # Periodical update
-        self.numberOfFiles = 0
-        timer = QTimer(self)
-        timer.timeout.connect(self.update_fifimon)
-        timer.start(5000)
-
-        # Open file to collect problematic files after renaming previous file
-        try:
-            os.rename('fifimon.exclude','fifimon.exclude.old')
-        except:
-            pass
-        self.excludefile = open('fifimon.exclude','w')
-
+        cwd = os.getcwd()
+        files = os.listdir(cwd)
+        self.numberOfFiles = len(files)
+        self.timer = QTimer(self)
         
     def changeVisibility(self):
         state = self.lf.isVisible()
@@ -700,6 +702,17 @@ class ApplicationWindow(QMainWindow):
         self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
         self.addObs(item, False, True)
 
+    def flightMode(self):
+        ''' switch between flight and QA mode'''    
+        self.flightmode ^= True
+        if self.flightmode:
+            self.timer.timeout.connect(self.update_fifimon)
+            self.timer.start(5000)
+            # In the future it should have the possibility to reduce
+            # blue and red channel at once (and display them)
+        else:
+            self.timer.timeout.disconnect()
+            
         
     def saveData(self):
         import json, io
@@ -761,14 +774,34 @@ class ApplicationWindow(QMainWindow):
             obsdate=value['obsdate'].decode('latin-1').encode('utf-8')
             order=value['order']
             dichroic=value['dichroic']
-            print obsdate
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
         print "Loading completed "
 
+
+    def saveExcludedFiles(self):
+        ''' Save the excluded file list if some is found '''    
+        if len(self.excludedFiles) == 0:
+            return
+        else:
+            # Open file to collect problematic files after renaming previous file
+            try:
+                os.rename('fifimon.exclude','fifimon.exclude.old')
+            except:
+                pass
+                self.excludefile = open('fifimon.exclude','w')
+            # Order list of excluded files
+            self.excludedFiles.sort()
+            # Save them
+            for f in self.excludedFiles:
+                self.excludefile.write(f)
+                self.excludefile.write('\n')
+            # Close the file
+            self.excludefile.close()
+        
         
     def fileQuit(self):
         self.saveData()
-        self.excludefile.close()
+        self.saveExcludedFiles()
         self.close()
 
     def closeEvent(self, ce):
@@ -839,8 +872,8 @@ class ApplicationWindow(QMainWindow):
         self.obs.append(obj)
 
     def update_exclude(self, infile):
-        self.excludefile.write(infile)
-        self.excludefile.write('\n')
+        '''We could save the list of files, order it, and save it at the end in one shot'''
+        self.excludedFiles.append(infile)
         
     def update_status(self, status):
         ''' process next item is available '''
