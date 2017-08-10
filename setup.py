@@ -15,5 +15,5 @@ setup(name='fifimon',
       packages=['fifimon'],
       scripts=['bin/fifimon'],
       include_package_data=True,
-      package_data={'fifimon':['icons/*.jpg','copyright.txt','CalibrationResults.csv']}
+      package_data={'fifimon':['icons/*.png','copyright.txt','CalibrationResults.csv']}
      )
