@@ -684,6 +684,11 @@ class ApplicationWindow(QMainWindow):
         timer.start(5000)
 
         # Open file to collect problematic files
+        # after checking if previous file exists and renaming it
+        try:
+            os.rename('fifimon.exclude','fifimon.exclude.old')
+        except:
+            pass
         self.excludefile = open('fifimon.exclude','w')
 
         
@@ -839,6 +844,7 @@ class ApplicationWindow(QMainWindow):
 
     def update_exclude(self, infile):
         self.excludefile.write(infile)
+        self.excludefile.write('\n')
         
     def update_status(self, status):
         ''' process next item is available '''
