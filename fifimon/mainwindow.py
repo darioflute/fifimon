@@ -674,17 +674,13 @@ class ApplicationWindow(QMainWindow):
         self.main_widget.setFocus()
         self.setCentralWidget(self.main_widget)
 
-        # Thread status
-        self.threadStatus = 'done'    
-        
         # Periodical update
         self.numberOfFiles = 0
         timer = QTimer(self)
         timer.timeout.connect(self.update_fifimon)
         timer.start(5000)
 
-        # Open file to collect problematic files
-        # after checking if previous file exists and renaming it
+        # Open file to collect problematic files after renaming previous file
         try:
             os.rename('fifimon.exclude','fifimon.exclude.old')
         except:
