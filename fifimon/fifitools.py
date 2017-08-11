@@ -239,7 +239,6 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
         
     path0,file0 = os.path.split(__file__)
     wvdf = pd.read_csv(path0+'/CalibrationResults.csv', header=[0, 1])
-    print len(wvdf.columns)
     ndates = (len(wvdf.columns)-2)//5
     dates = np.zeros(ndates)
     for i in range(ndates):
@@ -247,8 +246,6 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
 
     # Select correct date
     i = 0
-    print "dates are: ",dates
-    print "odate is: ", odate
     for date in dates:
         if date < odate:
             i+=1
@@ -278,8 +275,6 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
     QS = w1.ix[7][co]
     ISOFF = w1.ix[8:][co].values
 
-    print ISOFF
-    
     pix = np.arange(16)+1.
     result = np.zeros((25,16))
     result_dwdp = np.zeros((25,16))
