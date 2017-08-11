@@ -23,7 +23,7 @@ def exploreDirectory(path):
         try:
             h = hlf[0].header
             proc = h['PROCSTAT']
-            obstype = h['OBSTYPE']
+            #obstype = h['OBSTYPE']
             if proc == 'LEVEL_1':
                 #if obstype == 'OBJECT':
                 start.append(h['DATE-OBS'])
@@ -69,14 +69,14 @@ def readData(fitsfile):
         obsdate = header['DATE-OBS']
         dichroic = header['DICHROIC']
         if detchan == 'RED':
-            wvc = header['G_WAVE_R']
+            #wvc = header['G_WAVE_R']
             ncycles = header['C_CYC_R']
             start = header['G_STRT_R']
             step = header['G_SZUP_R']
             ngrat = header['G_PSUP_R']
             order = 1
         else:
-            wvc = header['G_WAVE_B']
+            #wvc = header['G_WAVE_B']
             ncycles = header['C_CYC_B']
             start = header['G_STRT_B']
             step = header['G_SZUP_B']
@@ -132,7 +132,7 @@ def computeSlope(i,data):
 
     #i2 = i / 25
     #i3 = i % 25
-    i3 = i
+    #i3 = i
     slopes = []
     for i1 in range(ng):
         for i2 in range(16):
