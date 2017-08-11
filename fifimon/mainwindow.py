@@ -788,7 +788,7 @@ class ApplicationWindow(QMainWindow):
                 os.rename('fifimon.exclude','fifimon.exclude.old')
             except:
                 pass
-                self.excludefile = open('fifimon.exclude','w')
+            self.excludefile = open('fifimon.exclude','w')
             # Order list of excluded files
             self.excludedFiles.sort()
             # Save them
