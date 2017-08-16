@@ -976,5 +976,5 @@ def main():
     app.exec_()
 
 # Ensure that the app is created once 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()
