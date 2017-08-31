@@ -1,9 +1,9 @@
 package:
   name: fifimon
-  version: 0.23.alpha
+  version: 0.1.beta
 
 source:
-  git_rev: v0.23-alpha
+  git_tag: python3
   git_url: https://github.com/darioflute/fifimon.git
 
 build:
