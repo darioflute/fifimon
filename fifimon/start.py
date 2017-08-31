@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import mainwindow
+from fifimon import mainwindow
 
 def main():
     mainwindow.main()

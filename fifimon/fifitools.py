@@ -173,7 +173,6 @@ def multiSlopes(data):
     ''' Compute slopes for each pixel and grating position using multiprocessing '''    
     import multiprocessing as mp
     import numpy as np
-    #from fifitools import computeSlope
     # If I don't import LinearModel here, then the multiprocessing stops after one file
     from lmfit.models import LinearModel
 

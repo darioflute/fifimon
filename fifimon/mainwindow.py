@@ -332,7 +332,7 @@ class FluxCanvas(MplCanvas):
 
 
     def updateFigure(self,nod,spec,infile,za,alti,wv,gp,order,obsdate,dichroic):
-        from fifitools import waveCal        
+        from fifimon.fifitools import waveCal        
         # get number of grating positions
         ng = (np.shape(spec))[0]
         start = sum(self.coverage)
@@ -438,7 +438,7 @@ class myListWidget(QListWidget):
 
     
 class UpdateObjects(QObject):
-    from fifitools import Obs
+    from fifimon.fifitools import Obs
     newObj = pyqtSignal([Obs])
 
 
@@ -457,7 +457,7 @@ class AddObsThread(QThread):
         self.processAll = processAll
         
     def run(self):
-        from fifitools import readData, multiSlopes, Obs
+        from fifimon.fifitools import readData, multiSlopes, Obs
         from timeit import default_timer as timer
 
         print ('files are: ',self.selFileNames)
@@ -580,7 +580,7 @@ class ApplicationWindow(QMainWindow):
         """)
 
         # Start exploring directory
-        from fifitools import exploreDirectory
+        from fifimon.fifitools import exploreDirectory
         cwd = os.getcwd()
         self.files, self.start, self.fgid, self.ch = exploreDirectory(cwd+"/")
         print ("Directory scanned")
@@ -759,7 +759,7 @@ class ApplicationWindow(QMainWindow):
     def loadData(self):
         import json
         from collections import OrderedDict
-        from fifitools import Obs
+        from fifimon.fifitools import Obs
         print ('loading previous reduced data')
         # Read the json file as ordered dictionary to preserve the
         # order the objects were saved
@@ -924,7 +924,7 @@ class ApplicationWindow(QMainWindow):
         for new files in the directory, update the lists and, eventually, the plot
         '''
 
-        from fifitools import exploreDirectory
+        from fifimon.fifitools import exploreDirectory
 
         # Check if there are new files
         cwd = os.getcwd()
