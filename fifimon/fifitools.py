@@ -154,7 +154,8 @@ def computeSlope(i,data):
             # Condense ramp
             m = np.isfinite(ramp)
             if np.sum(m) > 0:
-                y = np.nanmedian(ramp,axis=0)
+                # Get rid of first ramp
+                y = np.nanmedian(ramp[1:,:],axis=0)
                 # mask 1st value
                 y[0]=np.nan
                 dtime = 1./250.  ## 250 Hz
