@@ -121,16 +121,16 @@ def readData(fitsfile):
             
 
 def computeSlope(i,data):
-    ''' Module called by  multiSlope to compute a ramp slope '''   
-    from lmfit.models import LinearModel
+    ''' Module called by  multiSlope to compute ramp slopes '''   
     import numpy as np
+    from lmfit.models import LinearModel
+    linmodel = LinearModel()
 
     ds = np.shape(data)
     nramps = ds[1] // 32
     satlim = 2.7
     dtime = 1./250.  ## 250 Hz
     x = dtime * np.arange(32)
-    linmodel = LinearModel()
     slopes = []
     for ngramps in data:
         ngslopes = []
@@ -162,6 +162,7 @@ def computeSlope(i,data):
             else:
                 ngslopes.append(np.nan)
         slopes.append(ngslopes)
+
     return i,slopes
     
         
@@ -172,17 +173,20 @@ def multiSlopes(data):
     ''' Compute slopes for each pixel and grating position using multiprocessing '''    
     import multiprocessing as mp
     import numpy as np
-    from fifitools import computeSlope
+    #from fifitools import computeSlope
+    # If I don't import LinearModel here, then the multiprocessing stops after one file
+    from lmfit.models import LinearModel
 
-    #l,sl = computeSlope(0,data[:,:,:,0])
-    
-    ncpu = mp.cpu_count()
-    pool = mp.Pool(processes=ncpu)
-    print("pool created")
-    print(np.shape(data))
-    res = [pool.apply_async(computeSlope, args=(i,data[:,:,:,i])) for i in range(25)]
-    results = [p.get() for p in res]
-    pool.terminate() # Kill the pool once terminated (otherwise stays in memory)
+    #ncpu = mp.cpu_count()
+    #print(np.shape(data))
+        
+    #computeSlope(0,data[:,:,:,0],process=False) # This activates the processing, otherwise the 1st time it stops after processing one file
+    with mp.Pool(processes=mp.cpu_count()) as pool:
+        #print ("pool created")
+        #print(pool.apply(computeSlope, (0,data[:,:,:,0])))
+        res = [pool.apply_async(computeSlope, (i,data[:,:,:,i])) for i in range(25)]
+        results = [r.get() for r in res]
+    #pool.terminate() # Kill the pool once terminated (otherwise stays in memory)
     #results.sort()   not needed ...
         
     ds = np.shape(data)

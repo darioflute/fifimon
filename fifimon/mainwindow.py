@@ -469,9 +469,9 @@ class AddObsThread(QThread):
                 try:
                     t1=timer()
                     aor, hk, gratpos, flux = readData(infile+".fits")
-                    print("Data read from ",infile)
+                    #print("Data read from ",infile)
                     spectra = multiSlopes(flux)
-                    print("Slope fitted")
+                    #print("Slope fitted")
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
