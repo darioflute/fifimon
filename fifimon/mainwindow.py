@@ -206,13 +206,13 @@ class FluxCanvas(MplCanvas):
                 mw = self.parent().parent().parent().parent()
                 mw.sb.showMessage("File: "+fname+" --  Offset ("+"{:.0f}".format(offset[0]*3600.)+","+"{:.0f}".format(offset[1]*3600.)+") ",3000)
             except:
-                print "No data displayed"
+                print ("No data displayed")
 
                 
         elif event.button == 2:    
             self.dragged = event
             self.pick_pos = (event.xdata, event.ydata)
-            print "pick position: ", self.pick_pos
+            print ("pick position: ", self.pick_pos)
         elif event.button == 3:
             # Call popup menu to show housekeeping values (altitude, zenith angle, water vapor)
             pass
@@ -235,7 +235,7 @@ class FluxCanvas(MplCanvas):
 
 
     def drawZA(self):
-        print "Draw zenith angle"    
+        #print "Draw zenith angle"    
         self.displayZA ^= True
         self.zaLayer.set_visible(self.displayZA)
         self.draw_idle()
@@ -244,13 +244,13 @@ class FluxCanvas(MplCanvas):
         self.displayAlt ^= True
         self.altLayer.set_visible(self.displayAlt)
         self.draw_idle()
-        print "Draw altitude"    
+        #print "Draw altitude"    
 
     def drawWV(self):
         self.displayWV ^= True
         self.wvLayer.set_visible(self.displayWV)
         self.draw_idle()
-        print "Draw water vapor"    
+        #print "Draw water vapor"    
         
     def onMotion(self, event):
         if self.dragged is not None and self.pick_pos[0] is not None:
@@ -468,17 +468,17 @@ class AddObsThread(QThread):
                     obsdate, coords, offset, angle, za, altitude, wv = hk
                     obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     t2=timer()
-                    print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
+                    print ("Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s")
                     # Call this with a signal from thread
                     self.updateObjects.newObj.emit(obj)
                     self.updateFilenames.emit(infile)
                     self.updateFigures.emit(infile)
                 except:
-                    print "Problems with file: ", infile
+                    print ("Problems with file: ", infile)
                     self.updateExclude.emit(infile)
             else:
                 self.updateFigures.emit(infile)
-        print "Done adding observations thread"
+        print ("Done adding observations thread")
         if self.processAll:
             self.updateStatus.emit('next')
         # Disconnect signal at the end of the thread
@@ -573,7 +573,7 @@ class ApplicationWindow(QMainWindow):
         from fifitools import exploreDirectory
         cwd = os.getcwd()
         self.files, self.start, self.fgid, self.ch = exploreDirectory(cwd+"/")
-        print "Directory scanned"
+        print ("Directory scanned")
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
         
@@ -739,16 +739,18 @@ class ApplicationWindow(QMainWindow):
                 'spec': o.spec.tolist()
             }
         with io.open('fifimon.json', mode='w') as f:
-            str_= json.dumps(data,indent=2,sort_keys=True,
-                             separators=(',',': '), ensure_ascii=False,encoding='utf-8')
-            f.write(unicode(str_))
+            str_= json.dumps(data,indent=2,sort_keys=True,separators=(',',': '), ensure_ascii=False)
+            #,encoding='utf-8')
+            #f.write(unicode(str_))
+            #f.write(str(str_, 'utf-8'))
+            f.write(str_)
         pass    
 
     def loadData(self):
         import json
         from collections import OrderedDict
         from fifitools import Obs
-        print 'loading previous reduced data'
+        print ('loading previous reduced data')
         # Read the json file as ordered dictionary to preserve the
         # order the objects were saved
         with open('fifimon.json') as f:
@@ -775,7 +777,7 @@ class ApplicationWindow(QMainWindow):
             order=value['order']
             dichroic=value['dichroic']
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
-        print "Loading completed "
+        print ("Loading completed ")
 
 
     def saveExcludedFiles(self):
@@ -829,9 +831,9 @@ class ApplicationWindow(QMainWindow):
         channels = list(set(self.ch[mask]))
         self.channel = channels[0]
         # Check if there are files
-        print "there are ",np.sum(mask)," observations"
+        print ("there are ",np.sum(mask)," observations")
         if np.sum(mask) == 0:
-            print "There no files in this channel"
+            print ("There no files in this channel")
             return
         
         
@@ -850,7 +852,7 @@ class ApplicationWindow(QMainWindow):
                 self.pc.compute_initial_figure(ra,dec)
                 self.fc.compute_initial_figure(self.fileGroupId)
             except:
-                print "Failed to read file ",selFileNames[0]
+                print ("Failed to read file ",selFileNames[0])
                 return
         
             
@@ -900,7 +902,7 @@ class ApplicationWindow(QMainWindow):
         t2=timer()
         self.pc.updateFigure(nod,ra,dec,x,y,angle,infile)
         t3=timer()
-        print "Plotted ",infile," in ",t2-t1," and ",t3-t2," s"
+        print ("Plotted ",infile," in ",t2-t1," and ",t3-t2," s")
 
 
         
@@ -925,7 +927,7 @@ class ApplicationWindow(QMainWindow):
         # Check if new fileGroupID or files added
         try:
             if not self.files:
-                print 'There were no files !'
+                print ('There were no files !')
                 self.files=[]
                 self.fgid=[]
                 self.ch=[]
@@ -935,7 +937,7 @@ class ApplicationWindow(QMainWindow):
             
         for f,fg in zip(files,fgid):
             if f not in self.files:
-                print "updating file list ..."
+                print ("updating file list ...")
                 self.files = np.append(self.files,f)
                 self.fgid = np.append(self.fgid, fg)
                 self.ch = np.append(self.ch, ch)

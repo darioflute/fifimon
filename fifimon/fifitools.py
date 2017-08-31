@@ -58,11 +58,11 @@ def readData(fitsfile):
     procstat = header['PROCSTAT']
     obstype = header['OBSTYPE']
     if obstype != 'OBJECT':
-        print " This program works only with type OBJECT"
-        print fitsfile, "is a ", obstype, " file"
+        print (" This program works only with type OBJECT")
+        print (fitsfile, "is a ", obstype, " file")
         exit
     elif procstat != 'LEVEL_1':
-        print "This program works only with raw FIFI-LS files (Level 1)"
+        print ("This program works only with raw FIFI-LS files (Level 1)")
         exit
     else:
         detchan = header['DETCHAN']
@@ -108,7 +108,7 @@ def readData(fitsfile):
         data *= 3.63/65536.            # ADU to V
         nramps = np.size(data[:,0,0])
         if nramps < (ncycles*4*ngrat*32):
-            print "WARNING: Number of ramps does not agree with header for ",fitsfile
+            print ("WARNING: Number of ramps does not agree with header for ",fitsfile)
         else:
             data = data[:ncycles*4*ngrat*32,1:17,:25]
             flux = data.reshape(ngrat,ncycles*4*32,16,25)
