@@ -124,53 +124,44 @@ def computeSlope(i,data):
     ''' Module called by  multiSlope to compute a ramp slope '''   
     from lmfit.models import LinearModel
     import numpy as np
-    ds = np.shape(data)
-    ng = ds[0]
-    #i1=i%ng
-    #i2=i/25/5
-    #i3=(i/5)%25
 
-    #i2 = i / 25
-    #i3 = i % 25
-    #i3 = i
+    ds = np.shape(data)
+    nramps = ds[1] // 32
+    satlim = 2.7
+    dtime = 1./250.  ## 250 Hz
+    x = dtime * np.arange(32)
+    linmodel = LinearModel()
     slopes = []
-    for i1 in range(ng):
+    for ngramps in data:
+        ngslopes = []
         for i2 in range(16):
-            ramps = data[i1,:,i2]
-            # Reorganize them in groups of 32
-            nramps = np.size(ramps)/32
-            ramps = ramps.reshape(nramps,32)
+            # Reorganize data in ramps of 32 readouts
+            ramps = ngramps[:,i2].reshape(nramps,32)
             # select ramps
             ramp1 = ramps[1::4,:]
             ramp3 = ramps[3::4,:]
             # mask saturated values
-            satlim = 2.7
-            m1 = ramp1 > satlim
-            ramp1[m1] = np.nan
-            m3 = ramp3 > satlim
-            ramp3[m3] = np.nan
+            ramp1[ramp1 > satlim] = np.nan
+            ramp3[ramp3 > satlim] = np.nan
             # Differential ramps
             ramp = ramp1-ramp3
             # Condense ramp
             m = np.isfinite(ramp)
             if np.sum(m) > 0:
                 y = np.nanmedian(ramp,axis=0)
-                # mask 1st value
-                y[0]=np.nan
-                dtime = 1./250.  ## 250 Hz
-                x = dtime * np.arange(32)
-                # mask ramp
+                y[0]=np.nan  # mask 1st value
+                # Consider only finite values
                 mask = np.isfinite(y)
                 # Linear part
                 if np.sum(mask) > 10:  # At least 10 points to fit a line
-                    base = LinearModel()
-                    pars = base.guess(y[mask],x=x[mask])
-                    out = base.fit(y[mask],pars,x=x[mask])
-                    slopes.append(out.params['slope'].value)
+                    pars = linmodel.guess(y[mask],x=x[mask])
+                    out = linmodel.fit(y[mask],pars,x=x[mask])
+                    ngslopes.append(out.params['slope'].value)
                 else:
-                    slopes.append(np.nan)
+                    ngslopes.append(np.nan)
             else:
-                slopes.append(np.nan)
+                ngslopes.append(np.nan)
+        slopes.append(ngslopes)
     return i,slopes
     
         
@@ -182,36 +173,25 @@ def multiSlopes(data):
     import multiprocessing as mp
     import numpy as np
     from fifitools import computeSlope
-    #    import time
-    #import os
-    #os.system("taskset -p 0xff %d" % os.getpid())
 
-#    start = time.time()
-    ds = np.shape(data)
-    #arrD = mp.RawArray(ctypes.c_double,ds[0]*ds[1]*ds[2]*ds[3])
-
-    ng = ds[0]
+    #l,sl = computeSlope(0,data[:,:,:,0])
+    
     ncpu = mp.cpu_count()
-    #print "ncpu ", ncpu
     pool = mp.Pool(processes=ncpu)
+    print("pool created")
+    print(np.shape(data))
     res = [pool.apply_async(computeSlope, args=(i,data[:,:,:,i])) for i in range(25)]
     results = [p.get() for p in res]
     pool.terminate() # Kill the pool once terminated (otherwise stays in memory)
     #results.sort()   not needed ...
         
+    ds = np.shape(data)
+    ng = ds[0]
     spectra = np.zeros((ng,16,25))
-    for r in results:
-        i = r[0]
-        #i1=i%5
-        #i2=i/25/5
-        #i3=(i/5)%25
-        #i2 = i / 25
-        #i3 = i % 25
-        slopes = r[1]
-        for ig in range(ng):
-            spectra[ig,:,i] = slopes[ig*16:(ig+1)*16]
+    for i,slopes in results:
+        for ig,ngslopes in zip(range(ng),slopes):
+            spectra[ig,:,i] = ngslopes
 
-#    print "spectra computed by multiprocessing"
     return spectra
 
 def waveCal(gratpos,dichroic,obsdate,array,order):
@@ -235,7 +215,7 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
     # Extract month and year from date
     year = obsdate.split('-')[0] 
     month = obsdate.split('-')[1]   
-    odate = year[2:]+month
+    odate = int(year[2:]+month)
         
     path0,file0 = os.path.split(__file__)
     wvdf = pd.read_csv(path0+'/CalibrationResults.csv', header=[0, 1])

@@ -11,3 +11,7 @@ The package is available as anaconda package.
 To install it, do:
 
 conda install -c darioflute fifimon
+
+You will also have to install the lmfit package from astropy:
+
+conda install -c astropy lmfit

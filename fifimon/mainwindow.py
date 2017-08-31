@@ -36,6 +36,8 @@ import numpy as np
 import warnings
 #with warnings.catch_warnings():
 #    warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+
+
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
 
@@ -344,7 +346,7 @@ class FluxCanvas(MplCanvas):
         for j in np.arange(ng):
             x = sp16+start+j*0.5
             y = spec[j,:]
-            lines.append(zip(x,y))
+            lines.append(list(zip(x,y)))
         lc = LineCollection(lines, colors=color, linewidths=1)
         self.lines = self.axes2.add_collection(lc)
             
@@ -457,12 +459,19 @@ class AddObsThread(QThread):
     def run(self):
         from fifitools import readData, multiSlopes, Obs
         from timeit import default_timer as timer
+
+        print ('files are: ',self.selFileNames)
+        print ('previous files are: ', self.fileNames)
+
         for infile in self.selFileNames:
+            print (infile)
             if infile not in self.fileNames:
                 try:
                     t1=timer()
                     aor, hk, gratpos, flux = readData(infile+".fits")
+                    print("Data read from ",infile)
                     spectra = multiSlopes(flux)
+                    print("Slope fitted")
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
@@ -477,6 +486,7 @@ class AddObsThread(QThread):
                     print ("Problems with file: ", infile)
                     self.updateExclude.emit(infile)
             else:
+                print ('updating figure')
                 self.updateFigures.emit(infile)
         print ("Done adding observations thread")
         if self.processAll:
@@ -754,9 +764,11 @@ class ApplicationWindow(QMainWindow):
         # Read the json file as ordered dictionary to preserve the
         # order the objects were saved
         with open('fifimon.json') as f:
-            data = json.load(f, object_pairs_hook=OrderedDict, encoding='utf-8')
+            #data = json.load(f, object_pairs_hook=OrderedDict, encoding='utf-8')
+            data = json.load(f, object_pairs_hook=OrderedDict)
 
-        for key,value in data.iteritems():
+        for key,value in data.items():
+            print (key)
             self.fileNames.append(key)
             spec=np.array(value['spec'])
             x=value['x']
@@ -773,7 +785,7 @@ class ApplicationWindow(QMainWindow):
             gp=np.array(value['gp'])
             ch=value['ch']
             # Damn observation date has a character in latin-1 !
-            obsdate=value['obsdate'].decode('latin-1').encode('utf-8')
+            obsdate=value['obsdate']#.decode('latin-1').encode('utf-8')
             order=value['order']
             dichroic=value['dichroic']
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
