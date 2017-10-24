@@ -334,6 +334,7 @@ class FluxCanvas(MplCanvas):
     def updateFigure(self,nod,spec,infile,za,alti,wv,gp,order,obsdate,dichroic):
         from fifimon.fifitools import waveCal        
         # get number of grating positions
+
         ng = (np.shape(spec))[0]
         start = sum(self.coverage)
         self.coverage.append(16+0.5*(ng-1))
@@ -343,12 +344,41 @@ class FluxCanvas(MplCanvas):
         color = 'blue' if nod == 'A' else 'red'
 
         lines  = []
+        ly = []
         for j in np.arange(ng):
             x = sp16+start+j*0.5
             y = spec[j,:]
+            ly.append(y)
             lines.append(list(zip(x,y)))
         lc = LineCollection(lines, colors=color, linewidths=1)
         self.lines = self.axes2.add_collection(lc)
+
+        # Median spectrum for all the grating positions
+        ly = np.array(ly)
+        medline = np.nanmedian(ly,axis=0)
+        self.axes2.plot(sp16+start, medline, color='green')
+
+        # alpha = np.ones(ng)
+        # for j in np.arange(ng):
+        #     alpha[j] = np.nanmedian(medline/spec[j,:])
+
+        
+        # delta = np.zeros(ng)
+        # for j in np.arange(ng):
+        #     delta[j] = np.abs(np.nanmedian(ly[j,:]-medline))
+
+
+        # mdelta = np.nanmedian(delta)
+        # mask = delta > 3*mdelta
+        # if np.sum(mask) > 0:
+        #     for j in np.arange(ng):
+        #         if mask[j]:
+        #             self.axes2.plot(sp16+start+j*0.5,spec[j,:],color='yellow')
+
+        # for j in np.arange(ng):
+        #     self.axes2.plot(sp16+start+j*0.5,spec[j,:]*alpha[j],color='black')
+
+        
             
         self.axes1.axvline(start, color='gray', linewidth=0.2)            
         self.axes1.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
@@ -606,9 +636,9 @@ class ApplicationWindow(QMainWindow):
         self.quit_program = QAction('Quit',self,shortcut='Ctrl+q',triggered=self.fileQuit)
         self.file_menu.addAction(self.quit_program)
         
-        self.file_menu = self.menuBar().addMenu('&Help')
+        self.help_menu = self.menuBar().addMenu('&Help')
         self.about_code = QAction('About',self,shortcut='Ctrl+h',triggered=self.about)
-        self.file_menu.addAction(self.about_code)
+        self.help_menu.addAction(self.about_code)
 
         self.menuBar().setNativeMenuBar(False)
 
@@ -638,6 +668,9 @@ class ApplicationWindow(QMainWindow):
         procAction = QAction(QIcon(path0+'/icons/gears.png'), 'Process all data', self)
         procAction.setShortcut('Ctrl+P')
         procAction.triggered.connect(self.processAll)
+        modsaveAction = QAction(QIcon(path0+'/icons/save.png'), 'Scale and update data', self)
+        modsaveAction.setShortcut('Ctrl+M')
+        modsaveAction.triggered.connect(self.modsaveData)
         flyAction = QAction(QIcon(path0+'/icons/plane.png'), 'Switch between flight and QA mode', self)
         flyAction.setShortcut('Ctrl+F')
         flyAction.triggered.connect(self.flightMode)
@@ -648,6 +681,7 @@ class ApplicationWindow(QMainWindow):
         self.tb.setMovable(True)
         self.tb.addAction(hideAction)
         self.tb.addAction(procAction)
+        self.tb.addAction(modsaveAction)
         self.tb.addAction(flyAction)
         self.tb.addAction(exitAction)
         self.tb.setObjectName('tb')
@@ -722,7 +756,51 @@ class ApplicationWindow(QMainWindow):
             # blue and red channel at once (and display them)
         else:
             self.timer.timeout.disconnect()
+
+
+    def modsaveData(self):
+        from astropy.io import fits
+
+
+        buttonReply = QMessageBox.question(self, 'Rescale and save', "Do you want to rescale the data and update them ?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if buttonReply == QMessageBox.Yes:
+            print('Yes clicked.')
+            for fn,o in zip(self.fileNames,self.obs):
+                hdulist = fits.open(fn+".fits")
+                header = hdulist[0].header
+                scidata = hdulist[1].data
+                sciheader = hdulist[1].header
+                hdulist.close()
+                data = np.float32(scidata.DATA)+2**15
+                ncycles = header['C_CYC_B']
+                ngrat = header['G_PSUP_B']
+                ndata = ncycles*4*32
+                # Compute scaling factors
+                spec = o.spec
+                ly = []
+                for j in np.arange(ngrat):
+                    y = spec[j,:]
+                    ly.append(y)
+                ly = np.array(ly)
+                medline = np.nanmedian(ly,axis=0)
+                alpha = np.ones(ngrat)
+                for j in np.arange(ngrat):
+                    alpha[j] = np.nanmedian(medline/spec[j,:])
+                # Apply to raw data
+                for j in np.arange(ngrat):
+                    data[j*ndata:(j+1)*ndata,:,:] *= alpha[j]
+                # Save back to the file
+                data = np.int16(data-2**15)
+                scidata.DATA = data
+                fits.update(fn+".fits", scidata, sciheader, 'FIFILS_rawdata')
+                print(fn+' updated')
+        else:
+            print('No clicked.')
+            pass
+
             
+        
+        
         
     def saveData(self):
         import json, io
