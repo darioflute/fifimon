@@ -179,6 +179,11 @@ def multiSlopes(data):
     # If I don't import LinearModel here, then the multiprocessing stops after one file
     #from lmfit.models import LinearModel
 
+    # To avoid forking error in MAC OS-X
+    try:
+        mp.set_start_method('spawn')
+    except RuntimeError:
+        pass
         
     with mp.Pool(processes=mp.cpu_count()) as pool:
         res = [pool.apply_async(computeSlope, (i,data[:,:,:,i])) for i in range(25)]
