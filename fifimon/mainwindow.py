@@ -19,7 +19,7 @@ from matplotlib.collections import LineCollection
 
 # Make sure that we are using QT5
 import matplotlib
-matplotlib.use('Qt5Agg')
+matplotlib.use('QT5Agg')
 from PyQt5 import QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (QWidget, QMainWindow, QMessageBox,QToolBar,QAction,
                              QHBoxLayout, QVBoxLayout, QApplication, QListWidget,QSplitter,QMenu)
 from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QObject
+
 
 
 import os
@@ -40,6 +41,11 @@ import warnings
 
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
+
+
+# import for multiprocessing
+from fifitools import readData, multiSlopes, Obs
+from timeit import default_timer as timer
 
 
 class MplCanvas(FigureCanvas):
@@ -468,7 +474,7 @@ class myListWidget(QListWidget):
 
     
 class UpdateObjects(QObject):
-    from fifimon.fifitools import Obs
+    #from fifimon.fifitools import Obs
     newObj = pyqtSignal([Obs])
 
 
@@ -487,8 +493,6 @@ class AddObsThread(QThread):
         self.processAll = processAll
         
     def run(self):
-        from fifimon.fifitools import readData, multiSlopes, Obs
-        from timeit import default_timer as timer
 
         print ('files are: ',self.selFileNames)
         print ('previous files are: ', self.fileNames)
@@ -743,7 +747,8 @@ class ApplicationWindow(QMainWindow):
 
         self.processItem = 0
         item = self.fgidList[self.processItem]
-        self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+        #self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+        self.sb.showMessage("Processing FileGroupID: "+item,5000)
         self.addObs(item, False, True)
 
     def flightMode(self):
@@ -837,7 +842,7 @@ class ApplicationWindow(QMainWindow):
     def loadData(self):
         import json
         from collections import OrderedDict
-        from fifimon.fifitools import Obs
+        #from fifimon.fifitools import Obs
         print ('loading previous reduced data')
         # Read the json file as ordered dictionary to preserve the
         # order the objects were saved
@@ -972,7 +977,8 @@ class ApplicationWindow(QMainWindow):
         self.processItem += 1
         if self.processItem < len(self.fgidList):
             item = self.fgidList[self.processItem]
-            self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+            #self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+            self.sb.showMessage("Processing FileGroupID: "+item,5000)
             self.addObs(item, False, True)
             
     def update_filenames(self, infile):
@@ -980,7 +986,7 @@ class ApplicationWindow(QMainWindow):
         self.fileNames.append(infile)
       
     def update_figures(self, infile):
-        from timeit import default_timer as timer
+        #from timeit import default_timer as timer
 
         # Select obs corresponding to infile
         n = self.fileNames.index(infile)
@@ -1066,7 +1072,13 @@ def main():
     aw.setWindowTitle("%s" % progname)
     aw.show()
     app.exec_()
+    # lines for MAC OS-X
+    #import multiprocessing as mp
+    #mp.set_start_method('fork')
+    #mp.set_start_method('forkserver')
+    #mp.set_start_method('spawn')
 
+    
 # Ensure that the app is created once 
-#if __name__ == '__main__':
-#    main()
+if __name__ == '__main__':
+    main()

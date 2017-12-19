@@ -1,4 +1,7 @@
 # Several modules used for reading/reducing FIFI-LS data
+import multiprocessing as mp
+from lmfit.models import LinearModel
+import numpy as np
 
 
 def exploreDirectory(path):
@@ -171,21 +174,15 @@ def collectResults(results):
 
 def multiSlopes(data):
     ''' Compute slopes for each pixel and grating position using multiprocessing '''    
-    import multiprocessing as mp
-    import numpy as np
+    #import multiprocessing as mp
+    #import numpy as np
     # If I don't import LinearModel here, then the multiprocessing stops after one file
-    from lmfit.models import LinearModel
+    #from lmfit.models import LinearModel
 
-    #ncpu = mp.cpu_count()
-    #print(np.shape(data))
         
-    #computeSlope(0,data[:,:,:,0],process=False) # This activates the processing, otherwise the 1st time it stops after processing one file
     with mp.Pool(processes=mp.cpu_count()) as pool:
-        #print ("pool created")
-        #print(pool.apply(computeSlope, (0,data[:,:,:,0])))
         res = [pool.apply_async(computeSlope, (i,data[:,:,:,i])) for i in range(25)]
         results = [r.get() for r in res]
-    #pool.terminate() # Kill the pool once terminated (otherwise stays in memory)
     #results.sort()   not needed ...
         
     ds = np.shape(data)
