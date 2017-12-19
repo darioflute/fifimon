@@ -42,6 +42,7 @@ import warnings
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
 
+import multiprocessing as mp
 
 # import for multiprocessing
 from fifitools import readData, multiSlopes, Obs
@@ -1063,6 +1064,7 @@ class ApplicationWindow(QMainWindow):
 """ Main code """
         
 def main():
+
     app = QApplication(sys.argv)
     screen_resolution = app.desktop().screenGeometry()
     width = screen_resolution.width()
@@ -1072,13 +1074,13 @@ def main():
     aw.setWindowTitle("%s" % progname)
     aw.show()
     app.exec_()
-    # lines for MAC OS-X
-    #import multiprocessing as mp
-    #mp.set_start_method('fork')
-    #mp.set_start_method('forkserver')
-    #mp.set_start_method('spawn')
-
     
 # Ensure that the app is created once 
 if __name__ == '__main__':
+    # lines for MAC OS-X
+    #mp.set_start_method('fork')
+    #mp.set_start_method('forkserver')
+    #mp.set_start_method('spawn')
+    #print('mp method is: ',mp.get_start_method())
+    mp.set_start_method('forkserver')
     main()
