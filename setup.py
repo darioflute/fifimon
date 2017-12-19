@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
-import setuptools
 
 setup(name='fifimon',
       version='0.4.beta',
