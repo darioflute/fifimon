@@ -42,10 +42,10 @@ import warnings
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
 
-import multiprocessing as mp
+#import multiprocessing as mp
 
 # import for multiprocessing
-from fifitools import readData, multiSlopes, Obs
+from fifimon.fifitools import readData, multiSlopes, Obs
 from timeit import default_timer as timer
 
 
@@ -1076,11 +1076,6 @@ def main():
     app.exec_()
     
 # Ensure that the app is created once 
-if __name__ == '__main__':
-    # lines for MAC OS-X
-    #mp.set_start_method('fork')
-    #mp.set_start_method('forkserver')
-    #mp.set_start_method('spawn')
-    #print('mp method is: ',mp.get_start_method())
-    mp.set_start_method('forkserver')
-    main()
+#if __name__ == '__main__':
+#    mp.set_start_method('forkserver')
+#    main()
