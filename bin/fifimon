@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 if __name__ == '__main__':
-    import sys
+    import sys, multiprocessing
     from fifimon import start
-
+    multiprocessing.set_start_method('forkserver')
     sys.exit(start.main())

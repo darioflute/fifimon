@@ -1,6 +1,6 @@
 package:
   name: fifimon
-  version: 0.3.beta
+  version: 0.4.beta
 
 source:
   git_tag: python3
