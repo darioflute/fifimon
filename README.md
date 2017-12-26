@@ -12,6 +12,12 @@ To install it, do:
 
 conda install -c darioflute fifimon
 
+<<<<<<< HEAD
 You will have to install also the package lmfit:
 
 conda install -c astropy lmfit
+=======
+You will also have to install the lmfit package from astropy:
+
+conda install -c astropy lmfit
+>>>>>>> python3

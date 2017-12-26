@@ -19,7 +19,7 @@ from matplotlib.collections import LineCollection
 
 # Make sure that we are using QT5
 import matplotlib
-matplotlib.use('Qt5Agg')
+matplotlib.use('QT5Agg')
 from PyQt5 import QtWidgets
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -30,14 +30,22 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal, QObject
 
 
+
 import os
 import numpy as np
 #old_settings = np.seterr(all='ignore')  # Avoid warning messages
 import warnings
 #with warnings.catch_warnings():
 #    warnings.filterwarnings('ignore', r'All-NaN (slice|axis) encountered')
+
+
 # To avoid excessive warning messages
 warnings.filterwarnings('ignore')
+
+# import for multiprocessing
+from fifimon.fifitools import readData, multiSlopes, Obs
+#from fifitools import readData, multiSlopes, Obs
+from timeit import default_timer as timer
 
 
 class MplCanvas(FigureCanvas):
@@ -206,13 +214,13 @@ class FluxCanvas(MplCanvas):
                 mw = self.parent().parent().parent().parent()
                 mw.sb.showMessage("File: "+fname+" --  Offset ("+"{:.0f}".format(offset[0]*3600.)+","+"{:.0f}".format(offset[1]*3600.)+") ",3000)
             except:
-                print "No data displayed"
+                print ("No data displayed")
 
                 
         elif event.button == 2:    
             self.dragged = event
             self.pick_pos = (event.xdata, event.ydata)
-            print "pick position: ", self.pick_pos
+            print ("pick position: ", self.pick_pos)
         elif event.button == 3:
             # Call popup menu to show housekeeping values (altitude, zenith angle, water vapor)
             pass
@@ -235,7 +243,7 @@ class FluxCanvas(MplCanvas):
 
 
     def drawZA(self):
-        print "Draw zenith angle"    
+        #print "Draw zenith angle"    
         self.displayZA ^= True
         self.zaLayer.set_visible(self.displayZA)
         self.draw_idle()
@@ -244,13 +252,13 @@ class FluxCanvas(MplCanvas):
         self.displayAlt ^= True
         self.altLayer.set_visible(self.displayAlt)
         self.draw_idle()
-        print "Draw altitude"    
+        #print "Draw altitude"    
 
     def drawWV(self):
         self.displayWV ^= True
         self.wvLayer.set_visible(self.displayWV)
         self.draw_idle()
-        print "Draw water vapor"    
+        #print "Draw water vapor"    
         
     def onMotion(self, event):
         if self.dragged is not None and self.pick_pos[0] is not None:
@@ -330,8 +338,9 @@ class FluxCanvas(MplCanvas):
 
 
     def updateFigure(self,nod,spec,infile,za,alti,wv,gp,order,obsdate,dichroic):
-        from fifitools import waveCal        
+        from fifimon.fifitools import waveCal        
         # get number of grating positions
+
         ng = (np.shape(spec))[0]
         start = sum(self.coverage)
         self.coverage.append(16+0.5*(ng-1))
@@ -341,12 +350,41 @@ class FluxCanvas(MplCanvas):
         color = 'blue' if nod == 'A' else 'red'
 
         lines  = []
+        ly = []
         for j in np.arange(ng):
             x = sp16+start+j*0.5
             y = spec[j,:]
-            lines.append(zip(x,y))
+            ly.append(y)
+            lines.append(list(zip(x,y)))
         lc = LineCollection(lines, colors=color, linewidths=1)
         self.lines = self.axes2.add_collection(lc)
+
+        # Median spectrum for all the grating positions
+        ly = np.array(ly)
+        medline = np.nanmedian(ly,axis=0)
+        self.axes2.plot(sp16+start, medline, color='green')
+
+        # alpha = np.ones(ng)
+        # for j in np.arange(ng):
+        #     alpha[j] = np.nanmedian(medline/spec[j,:])
+
+        
+        # delta = np.zeros(ng)
+        # for j in np.arange(ng):
+        #     delta[j] = np.abs(np.nanmedian(ly[j,:]-medline))
+
+
+        # mdelta = np.nanmedian(delta)
+        # mask = delta > 3*mdelta
+        # if np.sum(mask) > 0:
+        #     for j in np.arange(ng):
+        #         if mask[j]:
+        #             self.axes2.plot(sp16+start+j*0.5,spec[j,:],color='yellow')
+
+        # for j in np.arange(ng):
+        #     self.axes2.plot(sp16+start+j*0.5,spec[j,:]*alpha[j],color='black')
+
+        
             
         self.axes1.axvline(start, color='gray', linewidth=0.2)            
         self.axes1.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
@@ -436,7 +474,7 @@ class myListWidget(QListWidget):
 
     
 class UpdateObjects(QObject):
-    from fifitools import Obs
+    #from fifimon.fifitools import Obs
     newObj = pyqtSignal([Obs])
 
 
@@ -455,30 +493,36 @@ class AddObsThread(QThread):
         self.processAll = processAll
         
     def run(self):
-        from fifitools import readData, multiSlopes, Obs
-        from timeit import default_timer as timer
+
+        print ('files are: ',self.selFileNames)
+        print ('previous files are: ', self.fileNames)
+
         for infile in self.selFileNames:
+            print (infile)
             if infile not in self.fileNames:
                 try:
                     t1=timer()
                     aor, hk, gratpos, flux = readData(infile+".fits")
+                    #print("Data read from ",infile)
                     spectra = multiSlopes(flux)
+                    #print("Slope fitted")
                     spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
                     obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     t2=timer()
-                    print "Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s"
+                    print ("Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s")
                     # Call this with a signal from thread
                     self.updateObjects.newObj.emit(obj)
                     self.updateFilenames.emit(infile)
                     self.updateFigures.emit(infile)
                 except:
-                    print "Problems with file: ", infile
+                    print ("Problems with file: ", infile)
                     self.updateExclude.emit(infile)
             else:
+                print ('updating figure')
                 self.updateFigures.emit(infile)
-        print "Done adding observations thread"
+        print ("Done adding observations thread")
         if self.processAll:
             self.updateStatus.emit('next')
         # Disconnect signal at the end of the thread
@@ -570,10 +614,10 @@ class ApplicationWindow(QMainWindow):
         """)
 
         # Start exploring directory
-        from fifitools import exploreDirectory
+        from fifimon.fifitools import exploreDirectory
         cwd = os.getcwd()
         self.files, self.start, self.fgid, self.ch = exploreDirectory(cwd+"/")
-        print "Directory scanned"
+        print ("Directory scanned")
         # Compile the list of unique File group IDs
         self.fgidList = list(set(self.fgid))
         
@@ -596,9 +640,9 @@ class ApplicationWindow(QMainWindow):
         self.quit_program = QAction('Quit',self,shortcut='Ctrl+q',triggered=self.fileQuit)
         self.file_menu.addAction(self.quit_program)
         
-        self.file_menu = self.menuBar().addMenu('&Help')
+        self.help_menu = self.menuBar().addMenu('&Help')
         self.about_code = QAction('About',self,shortcut='Ctrl+h',triggered=self.about)
-        self.file_menu.addAction(self.about_code)
+        self.help_menu.addAction(self.about_code)
 
         self.menuBar().setNativeMenuBar(False)
 
@@ -628,6 +672,9 @@ class ApplicationWindow(QMainWindow):
         procAction = QAction(QIcon(path0+'/icons/gears.png'), 'Process all data', self)
         procAction.setShortcut('Ctrl+P')
         procAction.triggered.connect(self.processAll)
+        modsaveAction = QAction(QIcon(path0+'/icons/save.png'), 'Scale and update data', self)
+        modsaveAction.setShortcut('Ctrl+M')
+        modsaveAction.triggered.connect(self.modsaveData)
         flyAction = QAction(QIcon(path0+'/icons/plane.png'), 'Switch between flight and QA mode', self)
         flyAction.setShortcut('Ctrl+F')
         flyAction.triggered.connect(self.flightMode)
@@ -638,6 +685,7 @@ class ApplicationWindow(QMainWindow):
         self.tb.setMovable(True)
         self.tb.addAction(hideAction)
         self.tb.addAction(procAction)
+        self.tb.addAction(modsaveAction)
         self.tb.addAction(flyAction)
         self.tb.addAction(exitAction)
         self.tb.setObjectName('tb')
@@ -699,7 +747,8 @@ class ApplicationWindow(QMainWindow):
 
         self.processItem = 0
         item = self.fgidList[self.processItem]
-        self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+        #self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+        self.sb.showMessage("Processing FileGroupID: "+item,5000)
         self.addObs(item, False, True)
 
     def flightMode(self):
@@ -712,7 +761,51 @@ class ApplicationWindow(QMainWindow):
             # blue and red channel at once (and display them)
         else:
             self.timer.timeout.disconnect()
+
+
+    def modsaveData(self):
+        from astropy.io import fits
+
+
+        buttonReply = QMessageBox.question(self, 'Rescale and save', "Do you want to rescale the data and update them ?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if buttonReply == QMessageBox.Yes:
+            print('Yes clicked.')
+            for fn,o in zip(self.fileNames,self.obs):
+                hdulist = fits.open(fn+".fits")
+                header = hdulist[0].header
+                scidata = hdulist[1].data
+                sciheader = hdulist[1].header
+                hdulist.close()
+                data = np.float32(scidata.DATA)+2**15
+                ncycles = header['C_CYC_B']
+                ngrat = header['G_PSUP_B']
+                ndata = ncycles*4*32
+                # Compute scaling factors
+                spec = o.spec
+                ly = []
+                for j in np.arange(ngrat):
+                    y = spec[j,:]
+                    ly.append(y)
+                ly = np.array(ly)
+                medline = np.nanmedian(ly,axis=0)
+                alpha = np.ones(ngrat)
+                for j in np.arange(ngrat):
+                    alpha[j] = np.nanmedian(medline/spec[j,:])
+                # Apply to raw data
+                for j in np.arange(ngrat):
+                    data[j*ndata:(j+1)*ndata,:,:] *= alpha[j]
+                # Save back to the file
+                data = np.int16(data-2**15)
+                scidata.DATA = data
+                fits.update(fn+".fits", scidata, sciheader, 'FIFILS_rawdata')
+                print(fn+' updated')
+        else:
+            print('No clicked.')
+            pass
+
             
+        
+        
         
     def saveData(self):
         import json, io
@@ -739,22 +832,26 @@ class ApplicationWindow(QMainWindow):
                 'spec': o.spec.tolist()
             }
         with io.open('fifimon.json', mode='w') as f:
-            str_= json.dumps(data,indent=2,sort_keys=True,
-                             separators=(',',': '), ensure_ascii=False,encoding='utf-8')
-            f.write(unicode(str_))
+            str_= json.dumps(data,indent=2,sort_keys=True,separators=(',',': '), ensure_ascii=False)
+            #,encoding='utf-8')
+            #f.write(unicode(str_))
+            #f.write(str(str_, 'utf-8'))
+            f.write(str_)
         pass    
 
     def loadData(self):
         import json
         from collections import OrderedDict
-        from fifitools import Obs
-        print 'loading previous reduced data'
+        #from fifimon.fifitools import Obs
+        print ('loading previous reduced data')
         # Read the json file as ordered dictionary to preserve the
         # order the objects were saved
         with open('fifimon.json') as f:
-            data = json.load(f, object_pairs_hook=OrderedDict, encoding='utf-8')
+            #data = json.load(f, object_pairs_hook=OrderedDict, encoding='utf-8')
+            data = json.load(f, object_pairs_hook=OrderedDict)
 
-        for key,value in data.iteritems():
+        for key,value in data.items():
+            print (key)
             self.fileNames.append(key)
             spec=np.array(value['spec'])
             x=value['x']
@@ -771,11 +868,11 @@ class ApplicationWindow(QMainWindow):
             gp=np.array(value['gp'])
             ch=value['ch']
             # Damn observation date has a character in latin-1 !
-            obsdate=value['obsdate'].decode('latin-1').encode('utf-8')
+            obsdate=value['obsdate']#.decode('latin-1').encode('utf-8')
             order=value['order']
             dichroic=value['dichroic']
             self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
-        print "Loading completed "
+        print ("Loading completed ")
 
 
     def saveExcludedFiles(self):
@@ -829,9 +926,9 @@ class ApplicationWindow(QMainWindow):
         channels = list(set(self.ch[mask]))
         self.channel = channels[0]
         # Check if there are files
-        print "there are ",np.sum(mask)," observations"
+        print ("there are ",np.sum(mask)," observations")
         if np.sum(mask) == 0:
-            print "There no files in this channel"
+            print ("There no files in this channel")
             return
         
         
@@ -850,7 +947,7 @@ class ApplicationWindow(QMainWindow):
                 self.pc.compute_initial_figure(ra,dec)
                 self.fc.compute_initial_figure(self.fileGroupId)
             except:
-                print "Failed to read file ",selFileNames[0]
+                print ("Failed to read file ",selFileNames[0])
                 return
         
             
@@ -880,7 +977,8 @@ class ApplicationWindow(QMainWindow):
         self.processItem += 1
         if self.processItem < len(self.fgidList):
             item = self.fgidList[self.processItem]
-            self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+            #self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
+            self.sb.showMessage("Processing FileGroupID: "+item,5000)
             self.addObs(item, False, True)
             
     def update_filenames(self, infile):
@@ -888,7 +986,7 @@ class ApplicationWindow(QMainWindow):
         self.fileNames.append(infile)
       
     def update_figures(self, infile):
-        from timeit import default_timer as timer
+        #from timeit import default_timer as timer
 
         # Select obs corresponding to infile
         n = self.fileNames.index(infile)
@@ -900,7 +998,7 @@ class ApplicationWindow(QMainWindow):
         t2=timer()
         self.pc.updateFigure(nod,ra,dec,x,y,angle,infile)
         t3=timer()
-        print "Plotted ",infile," in ",t2-t1," and ",t3-t2," s"
+        print ("Plotted ",infile," in ",t2-t1," and ",t3-t2," s")
 
 
         
@@ -910,7 +1008,7 @@ class ApplicationWindow(QMainWindow):
         for new files in the directory, update the lists and, eventually, the plot
         '''
 
-        from fifitools import exploreDirectory
+        from fifimon.fifitools import exploreDirectory
 
         # Check if there are new files
         cwd = os.getcwd()
@@ -925,7 +1023,7 @@ class ApplicationWindow(QMainWindow):
         # Check if new fileGroupID or files added
         try:
             if not self.files:
-                print 'There were no files !'
+                print ('There were no files !')
                 self.files=[]
                 self.fgid=[]
                 self.ch=[]
@@ -935,7 +1033,7 @@ class ApplicationWindow(QMainWindow):
             
         for f,fg in zip(files,fgid):
             if f not in self.files:
-                print "updating file list ..."
+                print ("updating file list ...")
                 self.files = np.append(self.files,f)
                 self.fgid = np.append(self.fgid, fg)
                 self.ch = np.append(self.ch, ch)
@@ -965,6 +1063,7 @@ class ApplicationWindow(QMainWindow):
 """ Main code """
         
 def main():
+
     app = QApplication(sys.argv)
     screen_resolution = app.desktop().screenGeometry()
     width = screen_resolution.width()
@@ -974,7 +1073,7 @@ def main():
     aw.setWindowTitle("%s" % progname)
     aw.show()
     app.exec_()
-
+    
 # Ensure that the app is created once 
 #if __name__ == '__main__':
 #    main()

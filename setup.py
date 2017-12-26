@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 from distutils.core import setup
-import setuptools
 
 setup(name='fifimon',
-      version='0.23.alpha',
+      version='0.4.beta',
       description='FIFI-LS Monitor',
       long_description='The package monitors FIFI-LS data',
       author='Dario Fadda',
