@@ -151,7 +151,6 @@ def computeSlope(i,data):
             # Condense ramp
             m = np.isfinite(ramp)
             if np.sum(m) > 0:
-<<<<<<< HEAD
                 # Get rid of first ramp
                 y = np.nanmedian(ramp[1:,:],axis=0)
                 # mask 1st value
@@ -159,11 +158,6 @@ def computeSlope(i,data):
                 dtime = 1./250.  ## 250 Hz
                 x = dtime * np.arange(32)
                 # mask ramp
-=======
-                y = np.nanmedian(ramp,axis=0)
-                y[0]=np.nan  # mask 1st value
-                # Consider only finite values
->>>>>>> python3
                 mask = np.isfinite(y)
                 # Linear part
                 if np.sum(mask) > 10:  # At least 10 points to fit a line
