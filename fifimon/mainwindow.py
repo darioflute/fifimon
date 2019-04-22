@@ -353,7 +353,10 @@ class FluxCanvas(MplCanvas):
         ly = []
         for j in np.arange(ng):
             x = sp16+start+j*0.5
-            y = spec[j,:]
+            if nod == 'A':
+                y = spec[j,:]
+            else:
+                y = -spec[j,:]
             ly.append(y)
             lines.append(list(zip(x,y)))
         lc = LineCollection(lines, colors=color, linewidths=1)
