@@ -117,6 +117,15 @@ class PositionCanvas(MplCanvas):
         #plt.ion()
         #plt.show(False)
 
+    def flightmode(self, flightmode):
+        if flightmode:
+            self.fig.suptitle('Flight mode')
+            self.fmode = True
+        else:
+            self.fig.suptitle('')
+            self.fmode = False
+        self.draw_idle()
+                
         
     def updateFigure(self, nod, ra, dec, dx, dy, angle, infile):
 
@@ -149,6 +158,10 @@ class PositionCanvas(MplCanvas):
         if xlim[0] < xlim[1]:
             self.axes.set_xlim([xlim[1],xlim[0]])
         # Update figure
+        if self.fmode:
+            self.fig.suptitle('Fligth mode')
+        else:
+            self.fig.suptitle('')
         self.draw_idle()
 
 class FluxCanvas(MplCanvas):
@@ -311,7 +324,7 @@ class FluxCanvas(MplCanvas):
         self.axes1.get_yaxis().set_tick_params(which='both', direction='in',colors='black', right='on',pad=-20)
         self.axes1.yaxis.set_label_coords(-0.07,0.5)
         self.axes1b = self.axes1.twinx()
-        self.axes1b.set_ylim([36000,45000])
+        self.axes1b.set_ylim([36000,45500])
         self.axes1b.get_yaxis().set_tick_params(labelright='on',right='on')            
         self.axes1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
         self.axes1b.yaxis.set_label_coords(-0.16,0.5)
@@ -489,11 +502,12 @@ class AddObsThread(QThread):
     updateFilenames = pyqtSignal('QString')
     updateStatus = pyqtSignal('QString')
 
-    def __init__(self, selFileNames, fileNames, processAll, parent=None):
+    def __init__(self, selFileNames, fileNames, processAll, firstRun, parent=None):
         super(AddObsThread, self).__init__(parent)
         self.selFileNames = selFileNames
         self.fileNames = fileNames
         self.processAll = processAll
+        self.firstRun = firstRun
         
     def run(self):
 
@@ -524,7 +538,8 @@ class AddObsThread(QThread):
                     self.updateExclude.emit(infile)
             else:
                 print ('updating figure')
-                self.updateFigures.emit(infile)
+                if self.firstRun:
+                    self.updateFigures.emit(infile)
         print ("Done adding observations thread")
         if self.processAll:
             self.updateStatus.emit('next')
@@ -764,6 +779,7 @@ class ApplicationWindow(QMainWindow):
             # blue and red channel at once (and display them)
         else:
             self.timer.timeout.disconnect()
+        self.pc.flightmode(self.flightmode)
 
 
     def modsaveData(self):
@@ -925,6 +941,7 @@ class ApplicationWindow(QMainWindow):
             return
 
         mask = self.fgid == self.fileGroupId
+        print('mask ',np.shape(mask), 'ch ',np.shape(self.ch))
         # Select the channel
         channels = list(set(self.ch[mask]))
         self.channel = channels[0]
@@ -954,7 +971,7 @@ class ApplicationWindow(QMainWindow):
                 return
         
             
-        self.addObsThread = AddObsThread(selFileNames,self.fileNames,processAll)
+        self.addObsThread = AddObsThread(selFileNames,self.fileNames,processAll,firstRun)
         self.addObsThread.updateObjects.newObj.connect(self.update_objects)
         self.addObsThread.updateFigures.connect(self.update_figures)
         self.addObsThread.updateExclude.connect(self.update_exclude)
@@ -1023,6 +1040,8 @@ class ApplicationWindow(QMainWindow):
 
         
         files, start, fgid, ch = exploreDirectory(cwd+"/")
+        print('ch ', ch)
+        print('fgid ' ,fgid)
         # Check if new fileGroupID or files added
         try:
             if not self.files:
@@ -1034,12 +1053,12 @@ class ApplicationWindow(QMainWindow):
             pass
 
             
-        for f,fg in zip(files,fgid):
+        for f,fg,ch_ in zip(files,fgid,ch):
             if f not in self.files:
                 print ("updating file list ...")
                 self.files = np.append(self.files,f)
                 self.fgid = np.append(self.fgid, fg)
-                self.ch = np.append(self.ch, ch)
+                self.ch = np.append(self.ch, ch_)
                 # update plot (if same fileGroupID)
                 self.addObs(None,True)
             if fg not in self.fgidList:
