@@ -72,6 +72,7 @@ class PositionCanvas(MplCanvas):
     def __init__(self, *args, **kwargs):
         MplCanvas.__init__(self, *args, **kwargs)
         self.cidPress = self.fig.canvas.mpl_connect('scroll_event', self.onWheel)
+        self.fmode = False
     
 
     def onWheel(self, event):
@@ -366,6 +367,7 @@ class FluxCanvas(MplCanvas):
         ly = []
         for j in np.arange(ng):
             x = sp16+start+j*0.5
+            #y = spec[j,:]
             if nod == 'A':
                 y = spec[j,:]
             else:

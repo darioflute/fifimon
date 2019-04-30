@@ -1,6 +1,6 @@
 # Several modules used for reading/reducing FIFI-LS data
 import multiprocessing as mp
-from lmfit.models import LinearModel
+#from lmfit.models import LinearModel
 import numpy as np
 
 
@@ -141,31 +141,52 @@ def computeSlope(i,data):
             # Reorganize data in ramps of 32 readouts
             ramps = ngramps[:,i2].reshape(nramps,32)
             # select ramps
+            ramp0 = ramps[0::4,:]
             ramp1 = ramps[1::4,:]
+            ramp2 = ramps[2::4,:]
             ramp3 = ramps[3::4,:]
+            rampOn = np.concatenate((ramp0, ramp1), axis=0)
+            rampOff = np.concatenate((ramp2, ramp3), axis=0)
             # mask saturated values
-            ramp1[ramp1 > satlim] = np.nan
-            ramp3[ramp3 > satlim] = np.nan
+            rampOn[rampOn > satlim] = np.nan
+            rampOff[rampOff > satlim] = np.nan
             # Differential ramps
-            ramp = ramp1-ramp3
+            # ramp = ramp1-ramp3
             # Condense ramp
-            m = np.isfinite(ramp)
+            m = np.isfinite(rampOn)
             if np.sum(m) > 0:
                 # Get rid of first ramp
-                y = np.nanmedian(ramp[1:,:],axis=0)
+                y1 = np.nanmedian(rampOn[1:,:],axis=0)
+                y2 = np.nanmedian(rampOff[1:,:],axis=0)
                 # mask 1st value
-                y[0]=np.nan
+                y1[0]=np.nan
+                y1[1]=np.nan
+                y1[-1]=np.nan
+                y2[0]=np.nan
+                y2[1]=np.nan
+                y2[-1]=np.nan
                 dtime = 1./250.  ## 250 Hz
                 x = dtime * np.arange(32)
                 # mask ramp
-                mask = np.isfinite(y)
+                mask = np.isfinite(y1)
                 # Linear part
                 if np.sum(mask) > 10:  # At least 10 points to fit a line
-                    pars = linmodel.guess(y[mask],x=x[mask])
-                    out = linmodel.fit(y[mask],pars,x=x[mask])
-                    ngslopes.append(out.params['slope'].value)
+                    pars = linmodel.guess(y1[mask],x=x[mask])
+                    out = linmodel.fit(y1[mask],pars,x=x[mask])
+                    slope1 = out.params['slope'].value
                 else:
-                    ngslopes.append(np.nan)
+                    slope1 = np.nan
+                mask = np.isfinite(y2)
+                # Linear part
+                if np.sum(mask) > 10:  # At least 10 points to fit a line
+                    pars = linmodel.guess(y2[mask],x=x[mask])
+                    out = linmodel.fit(y2[mask],pars,x=x[mask])
+                    slope2 = out.params['slope'].value
+                else:
+                    slope2 = np.nan
+
+                slope = slope1 - slope2
+                ngslopes.append(slope)
             else:
                 ngslopes.append(np.nan)
         slopes.append(ngslopes)
