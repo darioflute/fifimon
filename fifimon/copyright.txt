@@ -1,4 +1,4 @@
-Copyright 2017 -  Dario Fadda.
+Copyright 2017-2020 -  Dario Fadda.
 
 This program allows a quick processing and display of data obtained with FIFI-LS onboard SOFIA.
 

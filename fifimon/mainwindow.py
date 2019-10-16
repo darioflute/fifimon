@@ -123,7 +123,7 @@ class PositionCanvas(MplCanvas):
             self.fig.suptitle('Flight mode')
             self.fmode = True
         else:
-            self.fig.suptitle('')
+            self.fig.suptitle('Analysis mode')
             self.fmode = False
         self.draw_idle()
                 
@@ -162,7 +162,7 @@ class PositionCanvas(MplCanvas):
         if self.fmode:
             self.fig.suptitle('Fligth mode')
         else:
-            self.fig.suptitle('')
+            self.fig.suptitle('Analysis mode')
         self.draw_idle()
 
 class FluxCanvas(MplCanvas):
@@ -336,8 +336,8 @@ class FluxCanvas(MplCanvas):
         self.axes1c.yaxis.set_label_coords(-0.14,0.5)
         self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
         self.axes1d = self.axes1.twinx()
+        self.axes1d.yaxis.tick_left()
         self.axes1d.get_yaxis().set_tick_params(which='both', direction='out',colors='blue')
-        self.axes1d.get_yaxis().set_tick_params(labelleft='on', left='on',labelright='off',right='off')
         self.axes1d.yaxis.set_label_coords(-0.12,0.5)
         self.axes1d.set_ylabel('Wavelength [$\mu$m]',color='blue')    
         self.axes1d.set_ylim([50,200])
@@ -371,7 +371,9 @@ class FluxCanvas(MplCanvas):
             if nod == 'A':
                 y = spec[j,:]
             else:
-                y = -spec[j,:]
+                #y = -spec[j,:]
+                y = spec[j,:]
+                #y = -spec[j,:] -1  # y = 1/R - 1/2  -->  - (1/R - 1/2) -1 if R < 0
             ly.append(y)
             lines.append(list(zip(x,y)))
         lc = LineCollection(lines, colors=color, linewidths=1)
@@ -505,7 +507,8 @@ class AddObsThread(QThread):
     updateStatus = pyqtSignal('QString')
 
     def __init__(self, selFileNames, fileNames, processAll, firstRun, parent=None):
-        super(AddObsThread, self).__init__(parent)
+        #super(AddObsThread, self).__init__(parent)
+        super().__init__()
         self.selFileNames = selFileNames
         self.fileNames = fileNames
         self.processAll = processAll
@@ -522,12 +525,21 @@ class AddObsThread(QThread):
                 try:
                     t1=timer()
                     aor, hk, gratpos, flux = readData(infile+".fits")
-                    #print("Data read from ",infile)
-                    spectra = multiSlopes(flux)
-                    #print("Slope fitted")
-                    spectrum = np.nanmedian(spectra,axis=2)
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
+                    #print("Data read from ",infile)
+                    onspectra, offspectra = multiSlopes(flux)
+                    #print("Slope fitted")
+                    onspectrum = np.nanmedian(onspectra,axis=2)
+                    offspectrum = np.nanmedian(offspectra,axis=2)
+                    if nodbeam == 'A':
+                        print('nodbeam is: ', nodbeam)
+                        spectrum = onspectrum - offspectrum
+                        skyspectrum = offspectrum
+                    else:
+                        spectrum = offspectrum - onspectrum
+                        skyspectrum = onspectrum
+                    #obj = Obs(skyspectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     t2=timer()
                     print ("Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s")
@@ -542,11 +554,13 @@ class AddObsThread(QThread):
                 print ('updating figure')
                 if self.firstRun:
                     self.updateFigures.emit(infile)
-        print ("Done adding observations thread")
         if self.processAll:
             self.updateStatus.emit('next')
+        else:
+            self.updateStatus.emit('All processed')
         # Disconnect signal at the end of the thread
         self.updateObjects.newObj.disconnect()
+        print ("Done adding observations thread")
 
 
 class ApplicationWindow(QMainWindow):
@@ -633,6 +647,8 @@ class ApplicationWindow(QMainWindow):
         }
         """)
 
+
+        #os.register_at_fork()
         # Start exploring directory
         from fifimon.fifitools import exploreDirectory
         cwd = os.getcwd()
@@ -682,20 +698,20 @@ class ApplicationWindow(QMainWindow):
         self.mpl_toolbar2.setObjectName('tb2')
 
         # Actions
-        exitAction = QAction(QIcon(path0+'/icons/exit.png'), 'Exit the program', self)
+        exitAction = QAction(QIcon(os.path.join(path0,'icons','exit.png')), 'Exit the program', self)
         exitAction.setShortcut('Ctrl+Q')
         exitAction.triggered.connect(self.closeEvent)
         exitAction.setMenuRole(QAction.NoRole)
-        hideAction = QAction(QIcon(path0+'/icons/list.png'), 'List of File Group IDs', self)
+        hideAction = QAction(QIcon(os.path.join(path0,'icons','list.png')), 'List of File Group IDs', self)
         hideAction.setShortcut('Ctrl+L')
         hideAction.triggered.connect(self.changeVisibility)
-        procAction = QAction(QIcon(path0+'/icons/gears.png'), 'Process all data', self)
+        procAction = QAction(QIcon(os.path.join(path0,'icons','gears.png')), 'Process all data', self)
         procAction.setShortcut('Ctrl+P')
         procAction.triggered.connect(self.processAll)
-        modsaveAction = QAction(QIcon(path0+'/icons/save.png'), 'Scale and update data', self)
+        modsaveAction = QAction(QIcon(os.path.join(path0,'icons','save.png')), 'Scale and update data', self)
         modsaveAction.setShortcut('Ctrl+M')
         modsaveAction.triggered.connect(self.modsaveData)
-        flyAction = QAction(QIcon(path0+'/icons/plane.png'), 'Switch between flight and QA mode', self)
+        flyAction = QAction(QIcon(os.path.join(path0,'icons','plane.png')), 'Switch between flight and QA mode', self)
         flyAction.setShortcut('Ctrl+F')
         flyAction.triggered.connect(self.flightMode)
         
@@ -753,6 +769,7 @@ class ApplicationWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
 
         # Periodical update
+        self.computeStatus = False
         cwd = os.getcwd()
         files = os.listdir(cwd)
         self.numberOfFiles = len(files)
@@ -926,15 +943,18 @@ class ApplicationWindow(QMainWindow):
         self.fileQuit()
 
     def about(self):
+        from fifimon import __version__
         # Get path of the package
         path0,file0 = os.path.split(__file__)
-        file=open(path0+"/copyright.txt","r")
+        file=open(os.path.join(path0,"copyright.txt"),"r")
         message=file.read()
+        message = 'FIFIMON - version: ' + __version__ + '\n' + message
         QMessageBox.about(self, "About", message)
 
     def addObs(self, fileGroupId = None, newfiles=False, processAll=False):
         from astropy.io import fits
         import os
+        
         firstRun = 0
         if fileGroupId != None:
             self.fileGroupId = fileGroupId
@@ -948,7 +968,7 @@ class ApplicationWindow(QMainWindow):
         channels = list(set(self.ch[mask]))
         self.channel = channels[0]
         # Check if there are files
-        print ("there are ",np.sum(mask)," observations")
+        print ("there are ", np.sum(mask)," observations")
         if np.sum(mask) == 0:
             print ("There no files in this channel")
             return
@@ -958,6 +978,11 @@ class ApplicationWindow(QMainWindow):
         selFileNames = [os.path.splitext(os.path.basename(f))[0] for f in selFiles]
         selFileNames = np.array(selFileNames)
             
+        if self.computeStatus:
+            return
+        else:
+            self.computeStatus = True
+
         if firstRun:
             try:
                 # Grab RA-Dec of first file and restart the WCS
@@ -969,16 +994,18 @@ class ApplicationWindow(QMainWindow):
                 self.pc.compute_initial_figure(ra,dec)
                 self.fc.compute_initial_figure(self.fileGroupId)
             except:
-                print ("Failed to read file ",selFileNames[0])
+                print ("Failed to read file ", selFileNames[0])
                 return
         
-            
-        self.addObsThread = AddObsThread(selFileNames,self.fileNames,processAll,firstRun)
+        # Starts thread to compute slopes
+        self.addObsThread = AddObsThread(selFileNames, self.fileNames, processAll, firstRun)
         self.addObsThread.updateObjects.newObj.connect(self.update_objects)
         self.addObsThread.updateFigures.connect(self.update_figures)
         self.addObsThread.updateExclude.connect(self.update_exclude)
         self.addObsThread.updateFilenames.connect(self.update_filenames)
         self.addObsThread.updateStatus.connect(self.update_status)
+        #self.addObsThread.finished.connect(self.addObsThread.quit) # Quit once finished
+        print('starting new thread with files ', selFileNames)
         self.addObsThread.start()
         
         # Used memory check
@@ -996,13 +1023,21 @@ class ApplicationWindow(QMainWindow):
         
     def update_status(self, status):
         ''' process next item is available '''
+        if status == 'All processed':
+            print('Thread completed')
+            self.addObsThread.quit()
+            self.addObsThread.wait()
+            self.computeStatus = False
+            return
+        
         self.processItem += 1
         if self.processItem < len(self.fgidList):
             item = self.fgidList[self.processItem]
             #self.sb.showMessage("Processing FileGroupID: "+item.tostring(),5000)
             self.sb.showMessage("Processing FileGroupID: "+item,5000)
             self.addObs(item, False, True)
-            
+        self.addObsThread.quit()
+         
     def update_filenames(self, infile):
         #print "updating filenames with file ", infile
         self.fileNames.append(infile)
@@ -1031,7 +1066,7 @@ class ApplicationWindow(QMainWindow):
         '''
 
         from fifimon.fifitools import exploreDirectory
-
+        
         # Check if there are new files
         cwd = os.getcwd()
         files = os.listdir(cwd)
@@ -1041,7 +1076,8 @@ class ApplicationWindow(QMainWindow):
             self.numberOfFiles = len(files)
 
         
-        files, start, fgid, ch = exploreDirectory(cwd+"/")
+        files, start, fgid, ch = exploreDirectory(cwd)
+        print('files ', files)
         print('ch ', ch)
         print('fgid ' ,fgid)
         # Check if new fileGroupID or files added
@@ -1054,15 +1090,16 @@ class ApplicationWindow(QMainWindow):
         except:
             pass
 
-            
-        for f,fg,ch_ in zip(files,fgid,ch):
+        newfiles = 0
+        for f, fg, ch_ in zip(files, fgid, ch):
             if f not in self.files:
                 print ("updating file list ...")
-                self.files = np.append(self.files,f)
+                self.files = np.append(self.files, f)
                 self.fgid = np.append(self.fgid, fg)
                 self.ch = np.append(self.ch, ch_)
+                newfiles += 1
                 # update plot (if same fileGroupID)
-                self.addObs(None,True)
+                # self.addObs(None, True)
             if fg not in self.fgidList:
                 # update fileGroupID list    
                 self.fgidList.append(fg)
@@ -1078,17 +1115,19 @@ class ApplicationWindow(QMainWindow):
                     # Eventually hide list
                     self.lf.setVisible(False)
                     # Start new plot
-                    self.addObs(fg,False)
+                    self.addObs(fg, False)
                 else:
-                    pass    
-
+                    pass  
+        if newfiles > 0:
+            self.addObs(self.fileGroupId, True)
 
                 
 """ Main code """
         
 def main():
-
+    from fifimon import __version__
     app = QApplication(sys.argv)
+    app.setApplicationVersion(__version__)
     screen_resolution = app.desktop().screenGeometry()
     width = screen_resolution.width()
     aw = ApplicationWindow()
@@ -1097,7 +1136,4 @@ def main():
     aw.setWindowTitle("%s" % progname)
     aw.show()
     app.exec_()
-    
-# Ensure that the app is created once 
-#if __name__ == '__main__':
-#    main()
+    app.deleteLater() # to avoid weird QThread messages

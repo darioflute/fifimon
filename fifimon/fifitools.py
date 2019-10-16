@@ -3,7 +3,6 @@ import multiprocessing as mp
 #from lmfit.models import LinearModel
 import numpy as np
 
-
 def exploreDirectory(path):
     ''' Explore FITS files in a directory '''
     # Should be smarter and open only files not yet considered
@@ -13,7 +12,7 @@ def exploreDirectory(path):
     import numpy as np
     from datetime import datetime
     
-    files = sorted(glob.glob(path+'*w.fits'), key=os.path.getctime)
+    files = sorted(glob.glob(os.path.join(path,'*w.fits')), key=os.path.getctime)
     files = np.array(files)
 
     # Wavelenghts
@@ -134,9 +133,11 @@ def computeSlope(i,data):
     satlim = 2.7
     dtime = 1./250.  ## 250 Hz
     x = dtime * np.arange(32)
-    slopes = []
+    onslopes = []
+    offslopes = []
     for ngramps in data:
-        ngslopes = []
+        onngslopes = []
+        offngslopes = []
         for i2 in range(16):
             # Reorganize data in ramps of 32 readouts
             ramps = ngramps[:,i2].reshape(nramps,32)
@@ -184,14 +185,20 @@ def computeSlope(i,data):
                     slope2 = out.params['slope'].value
                 else:
                     slope2 = np.nan
-
-                slope = slope1 - slope2
-                ngslopes.append(slope)
+                #slope = slope1 - slope2 
+                #ratio = (slope1 - slope2) / (slope1 + slope2) * 2
+                #slope = 1/ratio - 0.5  # Ratio Flux/Sky
+                # median sky
+                #slope = 0.5 * (slope1 + slope2)
+                onngslopes.append(slope1)
+                offngslopes.append(slope2)
             else:
-                ngslopes.append(np.nan)
-        slopes.append(ngslopes)
+                onngslopes.append(np.nan)
+                offngslopes.append(np.nan)
+        onslopes.append(onngslopes)
+        offslopes.append(offngslopes)
 
-    return i,slopes
+    return i, onslopes, offslopes
     
         
 def collectResults(results):
@@ -217,12 +224,14 @@ def multiSlopes(data):
         
     ds = np.shape(data)
     ng = ds[0]
-    spectra = np.zeros((ng,16,25))
-    for i,slopes in results:
-        for ig,ngslopes in zip(range(ng),slopes):
-            spectra[ig,:,i] = ngslopes
+    onspectra = np.zeros((ng,16,25))
+    offspectra = np.zeros((ng,16,25))
+    for i, onslopes, offslopes in results:
+        for ig, onngslopes, offngslopes in zip(range(ng), onslopes, offslopes):
+            onspectra[ig,:,i] = onngslopes
+            offspectra[ig,:,i] = offngslopes
 
-    return spectra
+    return onspectra, offspectra
 
 def waveCal(gratpos,dichroic,obsdate,array,order):
     import numpy as np
@@ -245,23 +254,23 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
     # Extract month and year from date
     year = obsdate.split('-')[0] 
     month = obsdate.split('-')[1]   
-    odate = int(year[2:]+month)
+    obsdate = int(year[2:]+month)
         
     path0,file0 = os.path.split(__file__)
-    wvdf = pd.read_csv(path0+'/CalibrationResults.csv', header=[0, 1])
+    wvdf = pd.read_csv(os.path.join(path0, 'data', 'CalibrationResults.csv'), header=[0, 1])
     ndates = (len(wvdf.columns)-2)//5
     dates = np.zeros(ndates)
     for i in range(ndates):
         dates[i]= wvdf.columns[2+i*5][0]
 
     # Select correct date
-    i = 0
-    for date in dates:
-        if date < odate:
-            i+=1
-        else:
+    # Select correct date
+    for i, date in enumerate(dates):
+        if date < int(obsdate):
             pass
-    cols = range(2+5*(i-1),2+5*(i-1)+5)
+        else:
+            break
+    cols = range(2 + 5 * i , 2 + 5 * i + 5)
     w1=wvdf[wvdf.columns[cols]].copy()
     if channel == 'R':
         if dichroic == 105:
