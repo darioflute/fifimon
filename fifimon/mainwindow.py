@@ -43,7 +43,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # import for multiprocessing
-from fifimon.fifitools import readData, multiSlopes, Obs
+from fifimon.fifitools import readData, multiSlopes, Obs, applyFlats, waveCal
 #from fifitools import readData, multiSlopes, Obs
 from timeit import default_timer as timer
 
@@ -77,8 +77,8 @@ class PositionCanvas(MplCanvas):
 
     def onWheel(self, event):
         eb = event.button
-        curr_xlim = self.axes.get_xlim()
-        curr_ylim = self.axes.get_ylim()
+        curr_xlim = self.axis.get_xlim()
+        curr_ylim = self.axis.get_ylim()
         curr_x0 = (curr_xlim[0]+curr_xlim[1])*0.5
         curr_y0 = (curr_ylim[0]+curr_ylim[1])*0.5
         if eb == 'up':
@@ -87,8 +87,8 @@ class PositionCanvas(MplCanvas):
             factor=1.1
         new_width = (curr_xlim[1]-curr_xlim[0])*factor*0.5
         new_height= (curr_ylim[1]-curr_ylim[0])*factor*0.5
-        self.axes.set_xlim([curr_x0-new_width,curr_x0+new_width])
-        self.axes.set_ylim([curr_y0-new_height,curr_y0+new_height])
+        self.axis.set_xlim([curr_x0-new_width,curr_x0+new_width])
+        self.axis.set_ylim([curr_y0-new_height,curr_y0+new_height])
         self.draw_idle()
         
     def compute_initial_figure(self,ra=None,dec=None):
@@ -110,11 +110,11 @@ class PositionCanvas(MplCanvas):
         self.filename = []
         self.w.wcs.crval=[ra,dec]
 
-        self.axes = self.fig.add_subplot(111, projection=self.w)
-        self.t = self.axes.get_transform(self.w)
-        self.axes.axis('equal')
-        self.axes.coords[0].set_major_formatter('hh:mm:ss')
-        self.axes.plot(np.nan,np.nan)
+        self.axis = self.fig.add_subplot(111, projection=self.w)
+        self.t = self.axis.get_transform(self.w)
+        self.axis.axis('equal')
+        self.axis.coords[0].set_major_formatter('hh:mm:ss')
+        self.axis.plot(np.nan,np.nan)
         #plt.ion()
         #plt.show(False)
 
@@ -142,22 +142,22 @@ class PositionCanvas(MplCanvas):
         dx = side*0.5*(np.cos(theta)-np.sin(theta))
         dy = side*0.5*(np.sin(theta)+np.cos(theta))
         rect = Rectangle((x - dx, y - dy), side,side,angle=-angle,fc='none',ec=color)
-        self.axes.add_patch(rect)
+        self.axis.add_patch(rect)
         # Add patch on current position
         try:
             self.greenpatch.remove()
         except:
             pass
         greenrect = Rectangle((x - dx, y - dy), side,side,angle=-angle,fc='#C1FFC1',ec='none',alpha=0.6)
-        self.greenpatch = self.axes.add_patch(greenrect)
+        self.greenpatch = self.axis.add_patch(greenrect)
         
         # collect the patches to modify them later
         self.rects.append(rect)
-        self.axes.autoscale(enable=True, axis='both')
+        self.axis.autoscale(enable=True, axis='both')
         # Invert x axis
-        xlim = self.axes.get_xlim()
+        xlim = self.axis.get_xlim()
         if xlim[0] < xlim[1]:
-            self.axes.set_xlim([xlim[1],xlim[0]])
+            self.axis.set_xlim([xlim[1],xlim[0]])
         # Update figure
         if self.fmode:
             self.fig.suptitle('Fligth mode')
@@ -194,15 +194,15 @@ class FluxCanvas(MplCanvas):
         modifiers = QApplication.keyboardModifiers()
         # ShiftModifier does not work with MAC OSX ! I have to use control (the Apple icon)
         if modifiers == Qt.ControlModifier:
-            curr_ylim = self.axes2.get_ylim()
+            curr_ylim = self.axis2.get_ylim()
             curr_y0 = (curr_ylim[0]+curr_ylim[1])*0.5
             new_height= (curr_ylim[1]-curr_ylim[0])*factor*0.5
-            self.axes2.set_ylim([curr_y0-new_height,curr_y0+new_height])
+            self.axis2.set_ylim([curr_y0-new_height,curr_y0+new_height])
         else:
-            curr_xlim = self.axes2.get_xlim()
+            curr_xlim = self.axis2.get_xlim()
             curr_x0 = (curr_xlim[0]+curr_xlim[1])*0.5
             new_width = (curr_xlim[1]-curr_xlim[0])*factor*0.5
-            self.axes2.set_xlim([curr_x0-new_width,curr_x0+new_width])
+            self.axis2.set_xlim([curr_x0-new_width,curr_x0+new_width])
         self.draw_idle()
 
     def onPick(self, event):
@@ -215,8 +215,8 @@ class FluxCanvas(MplCanvas):
                 # draw rectangle on flux plot
                 self.gr1.remove()
                 self.gr2.remove()
-                self.gr1 = self.axes1.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
-                self.gr2 = self.axes2.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
+                self.gr1 = self.axis1.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
+                self.gr2 = self.axis2.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
                 # update position 
                 pc = self.parent().parent().parent().parent().pc
                 rect = pc.rects[n]
@@ -280,10 +280,10 @@ class FluxCanvas(MplCanvas):
             new_pos = (event.xdata,event.ydata)
             deltax = new_pos[0] - self.pick_pos[0]
             deltay = new_pos[1] - self.pick_pos[1]
-            curr_xlim = self.axes1.get_xlim()
-            curr_ylim = self.axes1.get_ylim()
-            self.axes1.set_xlim(curr_xlim-deltax)
-            self.axes1.set_ylim(curr_ylim-deltay)
+            curr_xlim = self.axis1.get_xlim()
+            curr_ylim = self.axis1.get_ylim()
+            self.axis1.set_xlim(curr_xlim-deltax)
+            self.axis1.set_ylim(curr_ylim-deltay)
             self.pick_pos = new_pos
             # Draw only when idle
             self.draw_idle()
@@ -315,44 +315,57 @@ class FluxCanvas(MplCanvas):
         self.coverage = []
         self.wvl = []
         self.wdict = {'0':0}
+        self.dwdict = {'0':0}
         self.zamin = 32
         self.zamax = 67
         # Create box
-        self.axes1 = self.fig.add_subplot(211)
-        self.axes1.set_xlim([0,20*20]) # Set at least 20 observations
-        self.axes1.set_ylim([25,75])
-        self.axes1.set_ylabel('Zenith angle [degs]')
-        self.axes1.get_yaxis().set_tick_params(which='both', direction='in',colors='black', right='on',pad=-20)
-        self.axes1.yaxis.set_label_coords(-0.07,0.5)
-        self.axes1b = self.axes1.twinx()
-        self.axes1b.set_ylim([36000,45500])
-        self.axes1b.get_yaxis().set_tick_params(labelright='on',right='on')            
-        self.axes1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
-        self.axes1b.yaxis.set_label_coords(-0.16,0.5)
-        self.axes1b.set_ylabel('Altitude [ft]',color='green')
-        self.axes1c = self.axes1.twinx()
-        self.axes1c.set_ylim([1,100])
-        self.axes1c.tick_params(labelright='on',right='on',direction='in',pad=-20,colors='orange')
-        self.axes1c.yaxis.set_label_coords(-0.14,0.5)
-        self.axes1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
-        self.axes1d = self.axes1.twinx()
-        self.axes1d.yaxis.tick_left()
-        self.axes1d.get_yaxis().set_tick_params(which='both', direction='out',colors='blue')
-        self.axes1d.yaxis.set_label_coords(-0.12,0.5)
-        self.axes1d.set_ylabel('Wavelength [$\mu$m]',color='blue')    
-        self.axes1d.set_ylim([50,200])
-        self.axes2 = self.fig.add_subplot(212,sharex=self.axes1)
-        self.axes2.set_ylabel('Flux [V/s]')
-        self.axes2.plot([0,0],[np.nan,np.nan],'.b')
-        self.axes2.yaxis.grid(True)
-        self.fig.subplots_adjust(hspace=0., bottom=0.1)
+        
+        self.grid1 = self.fig.add_gridspec(nrows=2, ncols=1, top=.95, bottom=0.4, hspace=0.0)
+        self.axis1 = self.fig.add_subplot(self.grid1[0,0])
+        self.axis2 = self.fig.add_subplot(self.grid1[1,0], sharex=self.axis1)
+        #self.axis1 = self.fig.add_subplot(211)
+        self.axis1.set_xlim([0,20*20]) # Set at least 20 observations
+        self.axis1.set_ylim([25,75])
+        self.axis1.set_ylabel('Zenith angle [degs]')
+        self.axis1.get_yaxis().set_tick_params(which='both', direction='in',colors='black', right='on',pad=-20)
+        self.axis1.yaxis.set_label_coords(-0.07,0.5)
+        self.axis1b = self.axis1.twinx()
+        self.axis1b.set_ylim([36000,45500])
+        self.axis1b.get_yaxis().set_tick_params(labelright='on',right='on')            
+        self.axis1b.get_yaxis().set_tick_params(which='both', direction='out',colors='green')
+        self.axis1b.yaxis.set_label_coords(-0.16,0.5)
+        self.axis1b.set_ylabel('Altitude [ft]',color='green')
+        self.axis1c = self.axis1.twinx()
+        self.axis1c.set_ylim([1,100])
+        self.axis1c.tick_params(labelright='on',right='on',direction='in',pad=-20,colors='orange')
+        self.axis1c.yaxis.set_label_coords(-0.14,0.5)
+        self.axis1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
+        self.axis1d = self.axis1.twinx()
+        self.axis1d.yaxis.tick_left()
+        self.axis1d.get_yaxis().set_tick_params(which='both', direction='out',colors='blue')
+        self.axis1d.yaxis.set_label_coords(-0.12,0.5)
+        self.axis1d.set_ylabel('Wavelength [$\mu$m]',color='blue')    
+        self.axis1d.set_ylim([50,200])
+        #self.axis2 = self.fig.add_subplot(212,sharex=self.axis1)
+        self.axis2.set_ylabel('Flux [V/s/Hz]')
+        self.axis2.plot([0,0],[np.nan,np.nan],'.b')
+        self.axis2.yaxis.grid(True)
+        #self.fig.subplots_adjust(hspace=0., bottom=0.1)
+        self.grid2 = self.fig.add_gridspec(nrows=1, ncols=2, top=0.35, bottom=0.05)
+        self.axis3 = self.fig.add_subplot(self.grid2[0,0])
+        self.axis4 = self.fig.add_subplot(self.grid2[0,1])
+        self.axis3.set_xlabel('Wavelength [$\mu$m]')    
+        self.axis4.set_xlabel('Wavelength [$\mu$m]')    
+        self.axis3.set_ylabel('Sky flux [V/s/Hz]')
+        self.axis4.set_ylabel('Chop diff flux [V/s/Hz]')
+        
         if fileGroupId is not None:
             mw = self.parent().parent().parent().parent()
             self.fig.suptitle(fileGroupId+" ("+mw.channel+")")
 
 
-    def updateFigure(self,nod,spec,infile,za,alti,wv,gp,order,obsdate,dichroic):
-        from fifimon.fifitools import waveCal        
+    def updateFigure(self,nod,wave,spec,sky,infile,za,alti,wv,gp,order,obsdate,dichroic,ra,dec):
+        #from fifimon.fifitools import waveCal        
         # get number of grating positions
 
         ng = (np.shape(spec))[0]
@@ -367,57 +380,29 @@ class FluxCanvas(MplCanvas):
         ly = []
         for j in np.arange(ng):
             x = sp16+start+j*0.5
-            #y = spec[j,:]
-            if nod == 'A':
-                y = spec[j,:]
-            else:
-                #y = -spec[j,:]
-                y = spec[j,:]
-                #y = -spec[j,:] -1  # y = 1/R - 1/2  -->  - (1/R - 1/2) -1 if R < 0
+            y = spec[j,:]
             ly.append(y)
             lines.append(list(zip(x,y)))
         lc = LineCollection(lines, colors=color, linewidths=1)
-        self.lines = self.axes2.add_collection(lc)
+        self.lines = self.axis2.add_collection(lc)
 
         # Median spectrum for all the grating positions
         ly = np.array(ly)
         medline = np.nanmedian(ly,axis=0)
-        self.axes2.plot(sp16+start, medline, color='green')
-
-        # alpha = np.ones(ng)
-        # for j in np.arange(ng):
-        #     alpha[j] = np.nanmedian(medline/spec[j,:])
-
-        
-        # delta = np.zeros(ng)
-        # for j in np.arange(ng):
-        #     delta[j] = np.abs(np.nanmedian(ly[j,:]-medline))
-
-
-        # mdelta = np.nanmedian(delta)
-        # mask = delta > 3*mdelta
-        # if np.sum(mask) > 0:
-        #     for j in np.arange(ng):
-        #         if mask[j]:
-        #             self.axes2.plot(sp16+start+j*0.5,spec[j,:],color='yellow')
-
-        # for j in np.arange(ng):
-        #     self.axes2.plot(sp16+start+j*0.5,spec[j,:]*alpha[j],color='black')
-
-        
+        self.axis2.plot(sp16+start, medline, color='green')
             
-        self.axes1.axvline(start, color='gray', linewidth=0.2)            
-        self.axes1.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
-        self.axes2.axvline(start, color='gray', linewidth=0.2)            
-        self.axes2.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
+        self.axis1.axvline(start, color='gray', linewidth=0.2)            
+        self.axis1.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
+        self.axis2.axvline(start, color='gray', linewidth=0.2)            
+        self.axis2.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
         # Update labels
         labels = np.array(self.labels, dtype='str')
         self.labpos.append(sum(self.coverage)-0.5*self.coverage[i-1])
-        self.axes2.set_xticks(self.labpos)
-        self.axes2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
+        self.axis2.set_xticks(self.labpos)
+        self.axis2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
         # Set limits around last observation (at least 20 observations)
-        self.axes2.set_xlim([self.coverage[i-1]*(i-1.5*self.w),self.coverage[i-1]*(i+0.5*self.w)])
-        self.axes2.autoscale(enable=True,axis='y')
+        self.axis2.set_xlim([self.coverage[i-1]*(i-1.5*self.w),self.coverage[i-1]*(i+0.5*self.w)])
+        self.axis2.autoscale(enable=True,axis='y')
 
         # Shade background of last position
         try:
@@ -426,8 +411,8 @@ class FluxCanvas(MplCanvas):
             self.gr2.remove()
         except:
             pass
-        self.gr1 = self.axes1.axvspan(start, start+self.coverage[i-1], alpha=0.6, color='#E7FFE7')
-        self.gr2 = self.axes2.axvspan(start, start+self.coverage[i-1], alpha=0.6, color='#E7FFE7')
+        self.gr1 = self.axis1.axvspan(start, start+self.coverage[i-1], alpha=0.6, color='#E7FFE7')
+        self.gr2 = self.axis2.axvspan(start, start+self.coverage[i-1], alpha=0.6, color='#E7FFE7')
         
         # Display curves
         xs = start
@@ -452,32 +437,35 @@ class FluxCanvas(MplCanvas):
         self.wvLayer = LineCollection(self.wvlines, colors='orange', linewidths=1)
 
         # Redraw
-        self.axes1.add_collection(self.zaLayer)
-        self.axes1b.add_collection(self.altLayer)
-        self.axes1c.add_collection(self.wvLayer)
+        self.axis1.add_collection(self.zaLayer)
+        self.axis1b.add_collection(self.altLayer)
+        self.axis1c.add_collection(self.wvLayer)
         
         # Hide/show curves
         self.altLayer.set_visible(self.displayAlt)
         self.zaLayer.set_visible(self.displayZA)
         self.wvLayer.set_visible(self.displayWV)
 
-        # Add grating position in blue
-        #self.axes1d.plot(xs+0.5*np.arange(ng), gp*.001,'.',color=color)
-        # Compute wavelenghts and plot them
+        # plot wavelengths, sky and object fluxes
         mw = self.parent().parent().parent().parent()
+        for l in self.axis3.lines:
+            l.set_alpha(.2)
+            l.set_linestyle(':')
+        for l in self.axis4.lines:
+            l.set_alpha(.2)
+            l.set_linestyle(':')
+        # To hide use linestyle('None')
         j=0
-        for g in gp:
-            if g in self.wdict:
-                waves = self.wdict[g]
-            else:
-                l,lw = waveCal(gratpos=g, order=order, array=mw.channel,dichroic=dichroic,obsdate=obsdate)
-                waves = l[12,:]
-                self.wdict[g]=waves
+        for g, w, sk, sp in zip(gp, wave, sky, spec):
             x = sp16+start+j*0.5
-            self.axes1d.plot(x,waves,'.',color=color)
-            self.wvl.append(waves)  # Conserve the central wavelengths
+            self.axis1d.plot(x, w,'.',color=color)
+            self.axis3.plot(w, sk, color=color)
+            self.axis4.plot(w, sp, color=color)
+            self.wvl.append(w)  # Conserve the central wavelengths
             j += 1
-        self.axes1d.autoscale(enable=True,axis='y')        
+            
+        
+        self.axis1d.autoscale(enable=True,axis='y')        
         self.draw_idle()
         ww = np.array(self.wvl)
         mw.sb.showMessage("Wavelength: "+"{:.1f}".format(np.min(ww))+" - "+"{:.1f}".format(np.median(ww))+" - "+"{:.1f}".format(np.max(ww)),5000)
@@ -518,7 +506,7 @@ class AddObsThread(QThread):
 
         print ('files are: ',self.selFileNames)
         print ('previous files are: ', self.fileNames)
-
+        c = 299792458.e+6 # um/s
         for infile in self.selFileNames:
             print (infile)
             if infile not in self.fileNames:
@@ -529,9 +517,31 @@ class AddObsThread(QThread):
                     obsdate, coords, offset, angle, za, altitude, wv = hk
                     #print("Data read from ",infile)
                     onspectra, offspectra = multiSlopes(flux)
+                    #offspectra, onspectra = multiSlopes(flux)
                     #print("Slope fitted")
+                    # Take the median over the space dimension of the detector
+                    # flat
+                    # We can apply flats here    
+                    wave = []
+                    dw  = []
+                    for gp in gratpos:
+                        l,lw = waveCal(gratpos=gp, order=order, array=detchan,dichroic=dichroic,obsdate=obsdate)
+                        wave.append(np.transpose(l))
+                        dw.append(np.transpose(lw))
+                    # Compute flux
+                    dw = np.array(dw)
+                    wave = np.array(wave)
+                    dnu = c/wave * dw/wave
+                    print(np.shape(wave), np.shape(onspectra))
+                    onspectra /= dnu
+                    offspectra /= dnu
+                    print('units V/s/Hz')
+                    onspectra = applyFlats(wave, onspectra, detchan, order, dichroic, obsdate)    
+                    offspectra = applyFlats(wave, offspectra, detchan, order, dichroic, obsdate)    
+                    print('flats applied')
                     onspectrum = np.nanmedian(onspectra,axis=2)
                     offspectrum = np.nanmedian(offspectra,axis=2)
+                    wave = np.nanmedian(wave, axis=2)
                     if nodbeam == 'A':
                         print('nodbeam is: ', nodbeam)
                         spectrum = onspectrum - offspectrum
@@ -539,8 +549,10 @@ class AddObsThread(QThread):
                     else:
                         spectrum = offspectrum - onspectrum
                         skyspectrum = onspectrum
+                        
                     #obj = Obs(skyspectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
-                    obj = Obs(spectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
+                    obj = Obs(wave,spectrum, skyspectrum, coords,offset,angle,altitude,
+                              za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     t2=timer()
                     print ("Fitted: ", infile, " ",np.shape(spectrum), " in: ", t2-t1," s")
                     # Call this with a signal from thread
@@ -867,7 +879,9 @@ class ApplicationWindow(QMainWindow):
                 'order': o.order,
                 'obsdate': o.obsdate,
                 'dichroic': o.dichroic,
-                'spec': o.spec.tolist()
+                'wave': o.wave.tolist(),
+                'spec': o.spec.tolist(),
+                'sky': o.sky.tolist()
             }
         with io.open('fifimon.json', mode='w') as f:
             str_= json.dumps(data,indent=2,sort_keys=True,separators=(',',': '), ensure_ascii=False)
@@ -892,6 +906,8 @@ class ApplicationWindow(QMainWindow):
             print (key)
             self.fileNames.append(key)
             spec=np.array(value['spec'])
+            sky=np.array(value['sky'])
+            wave=np.array(value['wave'])
             x=value['x']
             y=value['y']
             ra=value['ra']
@@ -909,7 +925,7 @@ class ApplicationWindow(QMainWindow):
             obsdate=value['obsdate']#.decode('latin-1').encode('utf-8')
             order=value['order']
             dichroic=value['dichroic']
-            self.obs.append(Obs(spec,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
+            self.obs.append(Obs(wave,spec,sky,(ra,dec),(x,y),angle,(alt[0],alt[1]),(za[0],za[1]),(wv[0],wv[1]),nod,fgid,n,gp,ch,order,obsdate,dichroic))
         print ("Loading completed ")
 
 
@@ -1049,11 +1065,11 @@ class ApplicationWindow(QMainWindow):
         n = self.fileNames.index(infile)
         o = self.obs[n]
         #print "updating figure with filename ", n
-        nod,ra,dec,x,y,angle,spectra,za,alti,wv,gp,order,obsdate,dichroic = o.nod,o.ra,o.dec,o.x,o.y,o.angle,o.spec,o.za,o.alt,o.wv,o.gp,o.order,o.obsdate,o.dichroic
+        
         t1=timer()
-        self.fc.updateFigure(nod,spectra,infile,za,alti,wv,gp,order,obsdate,dichroic)
+        self.fc.updateFigure(o.nod,o.wave,o.spec,o.sky,infile,o.za,o.alt,o.wv,o.gp,o.order,o.obsdate,o.dichroic,o.ra,o.dec)
         t2=timer()
-        self.pc.updateFigure(nod,ra,dec,x,y,angle,infile)
+        self.pc.updateFigure(o.nod,o.ra,o.dec,o.x,o.y,o.angle,infile)
         t3=timer()
         print ("Plotted ",infile," in ",t2-t1," and ",t3-t2," s")
 
@@ -1131,7 +1147,7 @@ def main():
     screen_resolution = app.desktop().screenGeometry()
     width = screen_resolution.width()
     aw = ApplicationWindow()
-    aw.setGeometry(100, 100, width*0.9, width*0.35)
+    aw.setGeometry(100, 100, width*0.9, width*0.45)
     progname = 'FIFI Monitor'
     aw.setWindowTitle("%s" % progname)
     aw.show()

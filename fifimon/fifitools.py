@@ -47,6 +47,75 @@ def exploreDirectory(path):
     return files[s], start[s], fgid[s], ch[s]
 
 
+def readFlats(channel, order, dichroic, obsdate, silent=False):
+    ''' Read flats '''
+    wflat, specflat, especflat = readSpecFlats(channel, order, dichroic, silent=silent)
+    spatflat = readSpatFlats(channel, obsdate, silent=silent)
+    return wflat, specflat, especflat, spatflat
+
+def readSpecFlats(channel, order, dichroic, silent=False):
+    ''' Read flats '''
+    import os
+    from astropy.io import fits
+    path0, file0 = os.path.split(__file__)
+    if channel == 'RED':
+        infile = os.path.join(path0,'data','spectralFlatsR1D'+str(dichroic)+'.fits.gz')
+    else:
+        infile = os.path.join(path0, 'data', 'spectralFlatsB'+str(order)+'D'+str(dichroic)+'.fits.gz')
+    hdl = fits.open(infile)
+    if silent == False:
+        hdl.info()
+    wflat = hdl['WAVE'].data
+    specflat = hdl['SPECFLAT'].data
+    especflat = hdl['ESPECFLAT'].data
+    hdl.close()
+    return wflat, specflat, especflat
+
+def readSpatFlats(channel, obsdate, silent=False):
+    ''' Read spatial flats.'''
+    import os, re
+    import numpy as np
+    path0, file0 = os.path.split(__file__)
+    if channel == 'RED':
+        infile = os.path.join(path0, 'data', 'spatialFlatR.txt')
+    else:
+        infile = os.path.join(path0, 'data', 'spatialFlatB.txt')
+    data = np.genfromtxt(infile,dtype='str',skip_header=1)
+    dates = data[:,0].astype(int)
+    spatflats = data[:, 1:].astype(float)
+    # Extract month, year, and day from date
+    parts = re.split('-|T|:', obsdate)
+    odate = int(parts[0]+parts[1]+parts[2])
+    # Select correct date
+    for date, spatflat in zip(dates, spatflats):
+        if date < odate:
+            pass
+        else:
+            return spatflat
+
+def applyFlats(waves, fluxes, channel, order, dichroic, obsdate):
+    ''' Apply flats to fluxes '''
+    
+    wflat, specflat, especflat, spatflat= readFlats(channel, order, dichroic, obsdate, silent=True)
+    for i in range(16):
+        for j in range(25):
+            sf = np.interp(waves[:,i,j], wflat, specflat[:,j,i])
+            fluxes[:,i,j] /= sf
+    for j in range(25):
+        fluxes[:,:,j] /= spatflat[j]
+    # Apply bad pixel mask
+    import os
+    path0, file0 = os.path.split(__file__)
+    if channel == 'RED':
+        bads = np.loadtxt(os.path.join(path0,'data','badpixels_2019_r.txt'))
+    else:
+        bads = np.loadtxt(os.path.join(path0,'data','badpixels_2019_b.txt'))
+    for bad in bads:
+        j,i = bad
+        fluxes[:,np.int(i)-1,np.int(j)-1] = np.nan
+    return fluxes
+
+
 
 def readData(fitsfile):
     from astropy.io import fits
@@ -312,8 +381,10 @@ def waveCal(gratpos,dichroic,obsdate,array,order):
 
 class Obs(object):
     """ Single observation """
-    def __init__(self,spectrum,coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition,channel,order,obsdate,dichroic):
+    def __init__(self,wave,spectrum, skyspectrum, coords,offset,angle,altitude,zenithAngle,waterVapor,nodbeam,fileGroupID,filenum,gratingPosition,channel,order,obsdate,dichroic):
+        self.wave = wave
         self.spec = spectrum
+        self.sky  = skyspectrum
         self.ra = coords[0]
         self.dec = coords[1]
         self.x = offset[0]
