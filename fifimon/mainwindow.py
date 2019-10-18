@@ -217,11 +217,33 @@ class FluxCanvas(MplCanvas):
                 self.gr2.remove()
                 self.gr1 = self.axis1.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
                 self.gr2 = self.axis2.axvspan(pl[n]-0.5*self.coverage[n], pl[n]+0.5*self.coverage[n], alpha=0.6, color='#E7FFE7')
-                # update position 
+               # update position 
                 pc = self.parent().parent().parent().parent().pc
                 rect = pc.rects[n]
                 pc.greenpatch.set_xy(rect.get_xy())
                 pc.draw_idle()
+                # show only lines around the position
+                for i, l in enumerate(self.axis4.lines):
+                    if self.linelab[i] == self.labpos[n]:
+                        l.set_alpha(1)
+                        l.set_linestyle('solid')
+                        ra0 = self.ra[i]
+                        dec0 = self.dec[i]
+                    else:
+                        l.set_alpha(0.2)
+                        l.set_linestyle('dotted')
+                
+                dist = np.hypot(np.array(self.ra)-ra0, np.array(self.dec)-dec0) * 3600.
+                for d, l in zip(dist, self.axis4.lines):
+                    if d > 30:
+                        l.set_linestyle('None')
+                for i, l in enumerate(self.axis3.lines):
+                    if self.linelab[i] == self.labpos[n]:
+                        l.set_alpha(1)
+                        l.set_linestyle('solid')
+                    else:
+                        l.set_linestyle('dotted')
+                        l.set_alpha(0.2)                
                 # write offset in the status bar
                 offset = pc.offsets[n]
                 fname  = pc.filename[n]
@@ -306,6 +328,9 @@ class FluxCanvas(MplCanvas):
         self.displayWV = True
 
         # Initialize variables
+        self.ra = []
+        self.dec = []
+        self.linelab = []
         self.zalines = []
         self.altlines =[]
         self.wvlines = []
@@ -364,7 +389,7 @@ class FluxCanvas(MplCanvas):
             self.fig.suptitle(fileGroupId+" ("+mw.channel+")")
 
 
-    def updateFigure(self,nod,wave,spec,sky,infile,za,alti,wv,gp,order,obsdate,dichroic,ra,dec):
+    def updateFigure(self,nod,wave,spec,sky,infile,za,alti,wv,gp,order,obsdate,dichroic,ra,dec,dx,dy):
         #from fifimon.fifitools import waveCal        
         # get number of grating positions
 
@@ -379,6 +404,8 @@ class FluxCanvas(MplCanvas):
         lines  = []
         ly = []
         for j in np.arange(ng):
+            self.ra.append(ra+dx)
+            self.dec.append(dec+dy)
             x = sp16+start+j*0.5
             y = spec[j,:]
             ly.append(y)
@@ -397,7 +424,10 @@ class FluxCanvas(MplCanvas):
         self.axis2.axvline(start+self.coverage[i-1], color='gray', linewidth=0.2)
         # Update labels
         labels = np.array(self.labels, dtype='str')
-        self.labpos.append(sum(self.coverage)-0.5*self.coverage[i-1])
+        labpos = sum(self.coverage)-0.5*self.coverage[i-1]
+        self.labpos.append(labpos)
+        for j in np.arange(ng):
+            self.linelab.append(labpos)
         self.axis2.set_xticks(self.labpos)
         self.axis2.set_xticklabels(labels,rotation=90,ha='center',fontsize=10)
         # Set limits around last observation (at least 20 observations)
@@ -454,7 +484,8 @@ class FluxCanvas(MplCanvas):
         for l in self.axis4.lines:
             l.set_alpha(.2)
             l.set_linestyle(':')
-        # To hide use linestyle('None')
+            
+            
         j=0
         for g, w, sk, sp in zip(gp, wave, sky, spec):
             x = sp16+start+j*0.5
@@ -463,7 +494,13 @@ class FluxCanvas(MplCanvas):
             self.axis4.plot(w, sp, color=color)
             self.wvl.append(w)  # Conserve the central wavelengths
             j += 1
-            
+        # Hide spectra from distant points           
+        ra = np.array(self.ra)
+        dec = np.array(self.dec)
+        dist = np.hypot(ra-ra[-1], dec-dec[-1]) * 3600.
+        for i, l in enumerate(self.axis4.lines):
+            if dist[i] > 30:
+                l.set_linestyle('None')
         
         self.axis1d.autoscale(enable=True,axis='y')        
         self.draw_idle()
@@ -539,8 +576,8 @@ class AddObsThread(QThread):
                     onspectra = applyFlats(wave, onspectra, detchan, order, dichroic, obsdate)    
                     offspectra = applyFlats(wave, offspectra, detchan, order, dichroic, obsdate)    
                     print('flats applied')
-                    onspectrum = np.nanmedian(onspectra,axis=2)
-                    offspectrum = np.nanmedian(offspectra,axis=2)
+                    onspectrum = np.nanmean(onspectra,axis=2)
+                    offspectrum = np.nanmean(offspectra,axis=2)
                     wave = np.nanmedian(wave, axis=2)
                     if nodbeam == 'A':
                         print('nodbeam is: ', nodbeam)
@@ -1067,7 +1104,8 @@ class ApplicationWindow(QMainWindow):
         #print "updating figure with filename ", n
         
         t1=timer()
-        self.fc.updateFigure(o.nod,o.wave,o.spec,o.sky,infile,o.za,o.alt,o.wv,o.gp,o.order,o.obsdate,o.dichroic,o.ra,o.dec)
+        self.fc.updateFigure(o.nod,o.wave,o.spec,o.sky,infile,o.za,o.alt,o.wv,o.gp,
+                             o.order,o.obsdate,o.dichroic,o.ra,o.dec,o.x,o.y)
         t2=timer()
         self.pc.updateFigure(o.nod,o.ra,o.dec,o.x,o.y,o.angle,infile)
         t3=timer()
