@@ -485,15 +485,14 @@ class FluxCanvas(MplCanvas):
             l.set_alpha(.2)
             l.set_linestyle(':')
             
-            
-        j=0
-        for g, w, sk, sp in zip(gp, wave, sky, spec):
+        # Plot sky and spectra
+        for j, (g, w, sk, sp) in enumerate(zip(gp, wave, sky, spec)):
             x = sp16+start+j*0.5
             self.axis1d.plot(x, w,'.',color=color)
             self.axis3.plot(w, sk, color=color)
             self.axis4.plot(w, sp, color=color)
             self.wvl.append(w)  # Conserve the central wavelengths
-            j += 1
+
         # Hide spectra from distant points           
         ra = np.array(self.ra)
         dec = np.array(self.dec)
