@@ -551,13 +551,7 @@ class AddObsThread(QThread):
                     aor, hk, gratpos, flux = readData(infile+".fits")
                     detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum = aor
                     obsdate, coords, offset, angle, za, altitude, wv = hk
-                    #print("Data read from ",infile)
                     onspectra, offspectra = multiSlopes(flux)
-                    #offspectra, onspectra = multiSlopes(flux)
-                    #print("Slope fitted")
-                    # Take the median over the space dimension of the detector
-                    # flat
-                    # We can apply flats here    
                     wave = []
                     dw  = []
                     for gp in gratpos:
@@ -568,18 +562,16 @@ class AddObsThread(QThread):
                     dw = np.array(dw)
                     wave = np.array(wave)
                     dnu = c/wave * dw/wave
-                    print(np.shape(wave), np.shape(onspectra))
+                    #print(np.shape(wave), np.shape(onspectra))
                     onspectra /= dnu
                     offspectra /= dnu
-                    print('units V/s/Hz')
                     onspectra = applyFlats(wave, onspectra, detchan, order, dichroic, obsdate)    
                     offspectra = applyFlats(wave, offspectra, detchan, order, dichroic, obsdate)    
-                    print('flats applied')
                     onspectrum = np.nanmean(onspectra,axis=2)
                     offspectrum = np.nanmean(offspectra,axis=2)
                     wave = np.nanmedian(wave, axis=2)
                     if nodbeam == 'A':
-                        print('nodbeam is: ', nodbeam)
+                        #print('nodbeam is: ', nodbeam)
                         spectrum = onspectrum - offspectrum
                         skyspectrum = offspectrum
                     else:

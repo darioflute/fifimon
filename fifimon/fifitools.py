@@ -186,6 +186,7 @@ def readData(fitsfile):
             gratpos = start+step*np.arange(ngrat)
             aor = (detchan, order, dichroic, ncycles, nodbeam, filegpid, filenum)
             hk  = (obsdate, (ra,dec), (dx,dy), angle, (za_sta,za_end), (alti_sta,alti_end), (wv_sta,wv_end))
+            #print("file ", fitsfile, " read")
             return aor, hk, gratpos, flux
 
 
