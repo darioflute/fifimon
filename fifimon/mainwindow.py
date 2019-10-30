@@ -1091,7 +1091,11 @@ class ApplicationWindow(QMainWindow):
 
         # Select obs corresponding to infile
         n = self.fileNames.index(infile)
-        o = self.obs[n]
+        try:
+            o = self.obs[n]
+        except:
+            print('no n observation')
+            return
         #print "updating figure with filename ", n
         
         t1=timer()
