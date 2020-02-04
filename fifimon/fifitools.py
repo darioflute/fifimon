@@ -8,6 +8,7 @@ def exploreDirectory(path):
     # Should be smarter and open only files not yet considered
     
     from astropy.io import fits
+    from astropy.time import Time
     import os, glob
     import numpy as np
     from datetime import datetime
@@ -35,14 +36,16 @@ def exploreDirectory(path):
             pass
         hlf.close()
 
+    time = Time(start, scale='utc')
+    s = time.argsort()
     start=np.array(start)
     fgid =np.array(fgid)
     ch   =np.array(ch)
 
     # Ideally I should order by date and time, now only by time
-    a = [datetime.strptime(s, '%Y-%m-%dT%H:%M:%S').time() for s in start]
-    a = np.array(a)
-    s = np.argsort(a)
+    #a = [datetime.strptime(s, '%Y-%m-%dT%H:%M:%S').time() for s in start]
+    #a = np.array(a)
+    #s = np.argsort(a)
 
     return files[s], start[s], fgid[s], ch[s]
 

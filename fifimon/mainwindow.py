@@ -393,6 +393,14 @@ class FluxCanvas(MplCanvas):
         #from fifimon.fifitools import waveCal        
         # get number of grating positions
 
+        #angle = za[0] * np.pi/180.
+        #cos_angle = np.cos(angle)
+        #r = 6383.5/10.  # assuming r_earth = 6371 km, altitude = 12.5 km, and 50 km of more stratosphere
+        #rcos = r * cos_angle
+        #depth = -rcos + np.sqrt(rcos * rcos + 1 + 2 * r) # Taking into account curvature of Earth
+        #transmission = np.exp(-depth)
+
+
         ng = (np.shape(spec))[0]
         start = sum(self.coverage)
         self.coverage.append(16+0.5*(ng-1))
@@ -486,11 +494,12 @@ class FluxCanvas(MplCanvas):
             l.set_linestyle(':')
             
         # Plot sky and spectra
+        #print(za[0], cos_angle, 1./depth)
         for j, (g, w, sk, sp) in enumerate(zip(gp, wave, sky, spec)):
             x = sp16+start+j*0.5
             self.axis1d.plot(x, w,'.',color=color)
-            self.axis3.plot(w, sk, color=color)
-            self.axis4.plot(w, sp, color=color)
+            self.axis3.plot(w, sk , color=color)
+            self.axis4.plot(w, sp , color=color)
             self.wvl.append(w)  # Conserve the central wavelengths
 
         # Hide spectra from distant points           
