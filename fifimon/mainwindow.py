@@ -128,7 +128,7 @@ class PositionCanvas(MplCanvas):
         self.draw_idle()
                 
         
-    def updateFigure(self, nod, ra, dec, dx, dy, angle, infile):
+    def updateFigure(self, nod, ra, dec, dx, dy, angle, infile, channel):
 
         x = ra+dx-self.w.wcs.crval[0]
         y = dec+dy-self.w.wcs.crval[1]
@@ -137,7 +137,10 @@ class PositionCanvas(MplCanvas):
         self.filename.append(infile)
         
         # Add rectangle patch
-        side = 30./3600.
+        if channel == 'RED':
+            side = 60./3600.
+        else:
+            side = 30./3600.
         theta = -angle*np.pi/180.
         dx = side*0.5*(np.cos(theta)-np.sin(theta))
         dy = side*0.5*(np.sin(theta)+np.cos(theta))
@@ -389,7 +392,7 @@ class FluxCanvas(MplCanvas):
             self.fig.suptitle(fileGroupId+" ("+mw.channel+")")
 
 
-    def updateFigure(self,nod,wave,spec,sky,infile,za,alti,wv,gp,order,obsdate,dichroic,ra,dec,dx,dy):
+    def updateFigure(self,nod,wave,spec,sky,infile,za,alti,wv,gp,order,obsdate,dichroic,ra,dec,dx,dy,channel):
         #from fifimon.fifitools import waveCal        
         # get number of grating positions
 
@@ -1109,9 +1112,9 @@ class ApplicationWindow(QMainWindow):
         
         t1=timer()
         self.fc.updateFigure(o.nod,o.wave,o.spec,o.sky,infile,o.za,o.alt,o.wv,o.gp,
-                             o.order,o.obsdate,o.dichroic,o.ra,o.dec,o.x,o.y)
+                             o.order,o.obsdate,o.dichroic,o.ra,o.dec,o.x,o.y,o.ch)
         t2=timer()
-        self.pc.updateFigure(o.nod,o.ra,o.dec,o.x,o.y,o.angle,infile)
+        self.pc.updateFigure(o.nod,o.ra,o.dec,o.x,o.y,o.angle,infile,o.ch)
         t3=timer()
         print ("Plotted ",infile," in ",t2-t1," and ",t3-t2," s")
 
