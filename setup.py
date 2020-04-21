@@ -20,7 +20,7 @@ config = {
     'packages': ['fifimon'],
     'scripts': ['bin/fifimon'],
     'include_package_data':True,
-    'package_data':{'obsmaker':['version.json','icons/*.png','copyright.txt','data/CalibrationResults.csv']},
+    'package_data':{'fifimon':['version.json','icons/*.png','copyright.txt','data/CalibrationResults.csv']},
     'install_requires': ['numpy', 'matplotlib', 'astropy'],
     'classifiers':[
             "Programming Language :: Python :: 3",
