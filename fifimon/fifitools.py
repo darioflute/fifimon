@@ -11,7 +11,7 @@ def exploreDirectory(path):
     from astropy.time import Time
     import os, glob
     import numpy as np
-    from datetime import datetime
+    #from datetime import datetime
     
     files = sorted(glob.glob(os.path.join(path,'*w.fits')), key=os.path.getctime)
     files = np.array(files)
@@ -36,7 +36,7 @@ def exploreDirectory(path):
             pass
         hlf.close()
 
-    time = Time(start, scale='utc')
+    time = Time(start, format='isot', scale='utc')
     s = time.argsort()
     start=np.array(start)
     fgid =np.array(fgid)
