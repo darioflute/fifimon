@@ -1,6 +1,9 @@
+{% set name = "fifimon" %}
+{% set data = load_setup_py_data() %}
+
 package:
-  name: fifimon
-  version: 0.4.beta
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
 
 source:
   git_tag: master
@@ -14,10 +17,10 @@ requirements:
     - setuptools
 
   run:
-    - python
+    - python >=3.7
     - numpy >=1.12.1
-    - astropy >=2.0.2
-    - matplotlib >=2.1.0
+    - astropy >=3.0
+    - matplotlib >=3.0.2
     
 test:
   imports:

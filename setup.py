@@ -15,6 +15,7 @@ config = {
     'author_email': 'darioflute@gmail.com',
     'url': 'https://github.com/darioflute/fifimon.git',
     'download_url': 'https://github.com/darioflute/fifimon',
+    'python_requires':'>=3.7',
     'license': 'GPLv3+',
     'packages': ['fifimon'],
     'scripts': ['bin/fifimon'],
