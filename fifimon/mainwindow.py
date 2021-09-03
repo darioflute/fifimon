@@ -364,7 +364,7 @@ class FluxCanvas(MplCanvas):
         self.axis1b.yaxis.set_label_coords(-0.16,0.5)
         self.axis1b.set_ylabel('Altitude [ft]',color='green')
         self.axis1c = self.axis1.twinx()
-        self.axis1c.set_ylim([1,100])
+        self.axis1c.set_ylim([1,20])
         self.axis1c.tick_params(labelright='on',right='on',direction='in',pad=-20,colors='orange')
         self.axis1c.yaxis.set_label_coords(-0.14,0.5)
         self.axis1c.set_ylabel('Water vapor [$\mu$m]',color='orange')
@@ -578,17 +578,20 @@ class AddObsThread(QThread):
                     onspectra /= dnu
                     offspectra /= dnu
                     onspectra = applyFlats(wave, onspectra, detchan, order, dichroic, obsdate)    
-                    offspectra = applyFlats(wave, offspectra, detchan, order, dichroic, obsdate)    
-                    onspectrum = np.nanmean(onspectra,axis=2)
-                    offspectrum = np.nanmean(offspectra,axis=2)
+                    offspectra = applyFlats(wave, offspectra, detchan, order, dichroic, obsdate) 
+                    # avoid bad column
+                    good = [0,1,2,3,5,6,7,8,10,11,12,13,15,16,17,18,20,21,22,23]
+                    onspectrum = np.nanmean(onspectra[:, :, good],axis=2)
+                    offspectrum = np.nanmean(offspectra[:, :, good],axis=2)
                     wave = np.nanmedian(wave, axis=2)
-                    if nodbeam == 'A':
-                        #print('nodbeam is: ', nodbeam)
-                        spectrum = onspectrum - offspectrum
-                        skyspectrum = offspectrum
-                    else:
-                        spectrum = offspectrum - onspectrum
-                        skyspectrum = onspectrum
+                    #if nodbeam == 'A':
+                    #    spectrum = onspectrum - offspectrum
+                    #    skyspectrum = offspectrum
+                    #else:
+                    #    spectrum = offspectrum - onspectrum
+                    #    skyspectrum = onspectrum
+                    spectrum = onspectrum - offspectrum
+                    skyspectrum = offspectrum
                         
                     #obj = Obs(skyspectrum,coords,offset,angle,altitude,za,wv,nodbeam,filegpid,filenum,gratpos,detchan,order,obsdate,dichroic)
                     obj = Obs(wave,spectrum, skyspectrum, coords,offset,angle,altitude,

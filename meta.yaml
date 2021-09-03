@@ -21,6 +21,7 @@ requirements:
     - numpy >=1.12.1
     - astropy >=3.0
     - matplotlib >=3.0.2
+    - pandas >=1.0.3
     
 test:
   imports:

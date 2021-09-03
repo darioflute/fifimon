@@ -120,7 +120,7 @@ def applyFlats(waves, fluxes, channel, order, dichroic, obsdate):
 
 
 
-def readData(fitsfile):
+def readData(fitsfile, subtractZero=True):
     from astropy.io import fits
     import numpy as np
 
@@ -173,15 +173,23 @@ def readData(fitsfile):
         alti_end = header['ALTI_END']
         za_sta = header['ZA_START']
         za_end = header['ZA_END']
-        wv_sta = header['WVZ_STA']
-        wv_end = header['WVZ_END']
+        try:
+            wv_sta = header['WVZ_OBS']
+            wv_end = wv_sta
+        except:
+            wv_sta = header['WVZ_STA']
+            wv_end = header['WVZ_END']
         angle = header['DET_ANGL']
         filename = header['FILENAME']
         filenum = int(filename[:5])            
-        data = np.float32(data)+2**15  # signed integer to float
-        data *= 3.63/65536.            # ADU to V
-        nramps = np.size(data[:,0,0])
-        if nramps < (ncycles*4*ngrat*32):
+        data = np.float32(data) / 2**16 + 0.5  # signed integer to float
+        data *= 3.63            # ADU to V
+        # Subtract pixel 0
+        if subtractZero:
+            for i in range(1,18):
+                data[:,i,:25] -= data[:,0,:25]
+        nreadouts = len(data)
+        if nreadouts < (ncycles*4*ngrat*32):
             print ("WARNING: Number of ramps does not agree with header for ",fitsfile)
         else:
             data = data[:ncycles*4*ngrat*32,1:17,:25]
@@ -203,7 +211,7 @@ def computeSlope(i,data):
 
     ds = np.shape(data)
     nramps = ds[1] // 32
-    satlim = 2.7
+    satlim = 2.6
     dtime = 1./250.  ## 250 Hz
     x = dtime * np.arange(32)
     onslopes = []
@@ -230,14 +238,12 @@ def computeSlope(i,data):
             m = np.isfinite(rampOn)
             if np.sum(m) > 0:
                 # Get rid of first ramp
-                y1 = np.nanmedian(rampOn[1:,:],axis=0)
-                y2 = np.nanmedian(rampOff[1:,:],axis=0)
+                y1 = np.nanmean(rampOn[1:,:],axis=0)
+                y2 = np.nanmean(rampOff[1:,:],axis=0)
                 # mask 1st value
-                y1[0]=np.nan
-                y1[1]=np.nan
+                y1[0:1]=np.nan
                 y1[-1]=np.nan
-                y2[0]=np.nan
-                y2[1]=np.nan
+                y2[0:1]=np.nan
                 y2[-1]=np.nan
                 dtime = 1./250.  ## 250 Hz
                 x = dtime * np.arange(32)
